@@ -3,10 +3,17 @@
 [![npm version](https://img.shields.io/badge/npm-1.0.0-blue.svg)](https://www.npmjs.com/package/dsh-plugin-tic80)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/dsh-plugin-purple.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![GitHub topic](https://img.shields.io/badge/topic-dsh--plugin-purple.svg)](https://github.com/topics/dsh-plugin)
 
-**dsh-plugin-tic80** 是专为 **DeepSeek Harness (dsh)** 打造的 **TIC-80 幻想计算机全功能生态插件**。
+中文文档 | [English](README.md)
+
+**dsh-plugin-tic80** 是专为 **DeepSeek Harness (dsh)** 打造的 **TIC-80 幻想计算机全功能生态插件**。更多相关生态插件请浏览 GitHub 话题：[`dsh-plugin`](https://github.com/topics/dsh-plugin)。
 
 保留 TIC-80 官方控制台的**全部功能**，并通过 DeepSeek Harness 与大语言模型（LLM）实现自然语言交互对话，让 LLM 能够自主编写 TIC-80 的 **代码、音乐（Tracker）、世界地图和精灵（像素艺术）**，并支持本地原生控制台与 Web 实时热重载（Live Studio）运行与测试。
+
+<p align="center">
+  <img src="./assets/preview.png" alt="DeepSeek Harness 内嵌 TIC-80 游戏工作台" width="100%" />
+</p>
 
 ---
 

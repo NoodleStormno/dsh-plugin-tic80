@@ -3,12 +3,17 @@
 [![npm version](https://img.shields.io/badge/npm-1.0.0-blue.svg)](https://www.npmjs.com/package/dsh-plugin-tic80)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/dsh-plugin-purple.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![GitHub topic](https://img.shields.io/badge/topic-dsh--plugin-purple.svg)](https://github.com/topics/dsh-plugin)
 
 [中文文档](README.zh.md) | English
 
-**dsh-plugin-tic80** is a full-featured **TIC-80 fantasy computer plugin** engineered specifically for **DeepSeek Harness (dsh)**.
+**dsh-plugin-tic80** is a full-featured **TIC-80 fantasy computer plugin** engineered specifically for **DeepSeek Harness (dsh)**. Explore more ecosystem plugins under the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic.
 
 It preserves 100% of TIC-80's official console capabilities while enabling conversational AI workflows where LLM agents can write **game code, tracker music, world maps, sound effects, and sprite pixel art**, running and testing games with live hot-reload in real-time.
+
+<p align="center">
+  <img src="./assets/preview.png" alt="DeepSeek Harness with Embedded TIC-80 Studio" width="100%" />
+</p>
 
 ---
 
