@@ -1,0 +1,52 @@
+{
+    "build_systems":
+    [
+        {
+            "name": "build",
+            "shell_cmd": "cd ${project_path}/build && cmake -G Ninja -DCMAKE_BUILD_TYPE=MinSizeRel .. && ninja",
+            "file_regex": "^(..[^:]*):([0-9]+):?([0-9]+)?:? (.*)$",
+            "working_dir": "${file_path}",
+            "variants":
+            [
+                {
+                    "name": "fresh",
+                    "shell_cmd": "cd ${project_path}/build && cmake -G Ninja .. --fresh"
+                },
+                {
+                    "name": "BUILD_STATIC=ON",
+                    "shell_cmd": "cd ${project_path}/build && cmake -DBUILD_STATIC=ON .."
+                },
+                {
+                    "name": "BUILD_STATIC=OFF",
+                    "shell_cmd": "cd ${project_path}/build && cmake -DBUILD_STATIC=OFF .."
+                },
+                {
+                    "name": "BUILD_PRO=ON",
+                    "shell_cmd": "cd ${project_path}/build && cmake -DBUILD_PRO=ON .."
+                },
+                {
+                    "name": "BUILD_PRO=OFF",
+                    "shell_cmd": "cd ${project_path}/build && cmake -DBUILD_PRO=OFF .."
+                },
+                {
+                    "name": "make",
+                    "shell_cmd": "cd ${project_path}/build && ninja"
+                },
+                {
+                    "name": "run",
+                    "shell_cmd": "cd ${project_path}/build && ninja tic80 && ${project_path}/build/bin/tic80 --skip"
+                },
+                {
+                    "name": "clean",
+                    "shell_cmd": "cd ${project_path}/build && ninja -t clean"
+                },
+            ]
+        }
+    ],
+    "folders":
+    [
+        {
+            "path": "."
+        }
+    ]
+}

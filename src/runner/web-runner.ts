@@ -22,6 +22,18 @@ export interface StudioStatus {
   lastLogs: string[];
 }
 
+export function resolveVendorFile(fileName: string): string | null {
+  const candidates = [
+    path.resolve('E:/dsh-plugin-tic80/vendor/tic80-web', fileName),
+    path.resolve(process.cwd(), 'vendor/tic80-web', fileName),
+    path.resolve(process.cwd(), 'node_modules/dsh-plugin-tic80/vendor/tic80-web', fileName),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
 export class WebStudioServer {
   private server: http.Server | null = null;
   private wss: WebSocketServer | null = null;
@@ -54,11 +66,31 @@ export class WebStudioServer {
         if (rawPath === '/tic80' || rawPath === '/tic80/' || rawPath === '/tic80/index.html') {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(this.generatePlayerHtml(this.currentCart || new Cartridge(), true));
+        } else if (rawPath === '/tic80/vendor/tic80.js') {
+          const filePath = resolveVendorFile('tic80.js');
+          if (filePath && fs.existsSync(filePath)) {
+            res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+            res.end(fs.readFileSync(filePath));
+          } else {
+            res.writeHead(404);
+            res.end('tic80.js not found');
+          }
+        } else if (rawPath === '/tic80/vendor/tic80.wasm') {
+          const filePath = resolveVendorFile('tic80.wasm');
+          if (filePath && fs.existsSync(filePath)) {
+            res.writeHead(200, {
+              'Content-Type': 'application/wasm',
+              'Cache-Control': 'public, max-age=3600'
+            });
+            res.end(fs.readFileSync(filePath));
+          } else {
+            res.writeHead(404);
+            res.end('tic80.wasm not found');
+          }
         } else if (rawPath === '/tic80/vendor/fengari-web.js') {
           const possiblePaths = [
             path.resolve('E:/dsh-plugin-tic80/node_modules/fengari-web/dist/fengari-web.js'),
             path.resolve(process.cwd(), 'node_modules/fengari-web/dist/fengari-web.js'),
-            path.resolve('E:/dsh-plugin-tic80/node_modules/fengari-web/dist/fengari-web.bundle.js'),
           ];
           let found = false;
           for (const p of possiblePaths) {
@@ -157,6 +189,27 @@ export class WebStudioServer {
         if (url === '/' || url === '/index.html') {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(this.generatePlayerHtml(this.currentCart || new Cartridge(), true));
+        } else if (url === '/vendor/tic80.js' || url === '/tic80/vendor/tic80.js') {
+          const filePath = resolveVendorFile('tic80.js');
+          if (filePath && fs.existsSync(filePath)) {
+            res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+            res.end(fs.readFileSync(filePath));
+          } else {
+            res.writeHead(404);
+            res.end('tic80.js not found');
+          }
+        } else if (url === '/vendor/tic80.wasm' || url === '/tic80/vendor/tic80.wasm') {
+          const filePath = resolveVendorFile('tic80.wasm');
+          if (filePath && fs.existsSync(filePath)) {
+            res.writeHead(200, {
+              'Content-Type': 'application/wasm',
+              'Cache-Control': 'public, max-age=3600'
+            });
+            res.end(fs.readFileSync(filePath));
+          } else {
+            res.writeHead(404);
+            res.end('tic80.wasm not found');
+          }
         } else if (url === '/vendor/fengari-web.js' || url === '/tic80/vendor/fengari-web.js') {
           const fengariFile = path.resolve('E:/dsh-plugin-tic80/node_modules/fengari-web/dist/fengari-web.js');
           if (fs.existsSync(fengariFile)) {
@@ -329,21 +382,26 @@ export class WebStudioServer {
   .tic80-header-right {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
   }
+  .tic80-header-right::-webkit-scrollbar { display: none; }
 
   .tic80-btn {
     background: #181d2c !important;
     color: #cbd5e1 !important;
     border: 1px solid #2b334a !important;
     border-radius: 5px !important;
-    padding: 4px 10px !important;
-    font-size: 11.5px !important;
+    padding: 3px 8px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
     cursor: pointer !important;
     display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 4px !important;
     transition: all 0.15s ease !important;
+    flex-shrink: 0 !important;
   }
 
   .tic80-btn:hover {
@@ -378,17 +436,20 @@ export class WebStudioServer {
   }
 
   #tic80-footer {
-    height: 32px !important;
-    min-height: 32px !important;
+    height: 28px !important;
+    min-height: 28px !important;
     background: #10121a !important;
     border-top: 1px solid #212534 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     padding: 0 12px !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     color: #8892b0 !important;
     font-family: monospace !important;
+    white-space: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
   }
 
   /* Draggable Resizer Splitter between TIC-80 and Chat */
@@ -435,22 +496,28 @@ export class WebStudioServer {
       pane.innerHTML = \`
         <div id="tic80-header">
           <div class="tic80-header-left">
-            <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80 游戏机</span>
+            <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80 官方完整版</span>
             <span style="color:#94a3b8; font-size:12px; font-family:monospace;">game.lua</span>
           </div>
           <div class="tic80-header-right">
-            <button class="tic80-btn tic80-btn-primary" id="btn-tic-restart" title="重启当前卡带">🔄 重置游戏 (F5)</button>
-            <button class="tic80-btn" id="btn-tic-mute" title="切换声音">🔊 音效</button>
+            <button class="tic80-btn" id="btn-tic-esc" title="切换到控制台终端命令行 (Esc)">🖥️ 终端 (Esc)</button>
+            <button class="tic80-btn" id="btn-tic-f1" title="切换到代码编辑器 (F1)">📝 代码 (F1)</button>
+            <button class="tic80-btn" id="btn-tic-f2" title="切换到精灵/图块编辑器 (F2)">🎨 精灵 (F2)</button>
+            <button class="tic80-btn" id="btn-tic-f3" title="切换到地图编辑器 (F3)">🗺️ 地图 (F3)</button>
+            <button class="tic80-btn" id="btn-tic-f4" title="切换到音效编辑器 (F4)">🔊 音效 (F4)</button>
+            <button class="tic80-btn" id="btn-tic-f5" title="切换到音乐Tracker (F5)">🎵 音乐 (F5)</button>
+            <button class="tic80-btn tic80-btn-primary" id="btn-tic-run" title="运行/恢复游戏 (Ctrl+R / F11)">▶️ 运行 (Ctrl+R)</button>
+            <button class="tic80-btn" id="btn-tic-restart" title="重启并重新加载卡带">🔄 重置</button>
             <button class="tic80-btn" id="btn-tic-export" title="导出 .TIC 独立文件">💾 导出 .TIC</button>
-            <button class="tic80-btn" id="btn-tic-popout" title="新标签页全屏打开">🗔 弹窗</button>
+            <button class="tic80-btn" id="btn-tic-popout" title="新标签页打开">🗔 弹窗</button>
           </div>
         </div>
         <div id="tic80-viewport">
           <iframe id="tic80-iframe" src="/tic80/" allow="autoplay"></iframe>
         </div>
         <div id="tic80-footer">
-          <span>🎮 240x136 @ 60 FPS | Sweetie-16</span>
-          <span>⚡ 热重载实时生效 | 方向键/WASD 移动 | Z/X 交互</span>
+          <span>🎮 官方 TIC-80 虚拟电脑 | CLI 命令行 | F1代码 F2精灵 F3地图 F4音效 F5音乐</span>
+          <span>⚡ Esc 终端 | Ctrl+R / F11 运行 | 方向键 / WASD 移动 | Z / X 交互</span>
         </div>
       \`;
 
@@ -463,15 +530,25 @@ export class WebStudioServer {
       centerCol.insertBefore(pane, splitter);
 
       // 4. Wire control buttons
-      pane.querySelector('#btn-tic-restart').onclick = () => {
-        const iframe = document.getElementById('tic80-iframe');
-        if (iframe) iframe.src = iframe.src;
-      };
-
-      pane.querySelector('#btn-tic-mute').onclick = () => {
+      const sendKeyMsg = (key, code, keyCode, ctrl = false) => {
         const iframe = document.getElementById('tic80-iframe');
         if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({ type: 'TOGGLE_MUTE' }, '*');
+          iframe.contentWindow.postMessage({ type: 'SEND_KEY', key, code, keyCode, ctrl }, '*');
+        }
+      };
+
+      pane.querySelector('#btn-tic-esc').onclick = () => sendKeyMsg('Escape', 'Escape', 27);
+      pane.querySelector('#btn-tic-f1').onclick = () => sendKeyMsg('F1', 'F1', 112);
+      pane.querySelector('#btn-tic-f2').onclick = () => sendKeyMsg('F2', 'F2', 113);
+      pane.querySelector('#btn-tic-f3').onclick = () => sendKeyMsg('F3', 'F3', 114);
+      pane.querySelector('#btn-tic-f4').onclick = () => sendKeyMsg('F4', 'F4', 115);
+      pane.querySelector('#btn-tic-f5').onclick = () => sendKeyMsg('F5', 'F5', 116);
+      pane.querySelector('#btn-tic-run').onclick = () => sendKeyMsg('r', 'KeyR', 82, true);
+
+      pane.querySelector('#btn-tic-restart').onclick = () => {
+        const iframe = document.getElementById('tic80-iframe');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({ type: 'RELOAD_CART' }, '*');
         }
       };
 
@@ -545,316 +622,238 @@ export class WebStudioServer {
   }
 
   /**
-   * Generates the self-contained retro HTML5 player bundle running inside the iframe.
-   * Utilizes Fengari for genuine Lua 5.3 execution, HTML5 Canvas 240x136, and Web Audio.
+   * Generates the official TIC-80 WebAssembly HTML5 player bundle running inside the iframe.
+   * Utilizes the authentic TIC-80 WASM engine with full CLI, F1-F5 editors, and game execution.
    */
   generatePlayerHtml(cart: Cartridge, liveSync: boolean = false): string {
     const cartTextJson = JSON.stringify(cart.toText());
-    const title = cart.metadata.title || 'TIC-80 Fantasy Console';
-    const author = cart.metadata.author || 'TIC-80 Developer';
+    const title = cart.metadata.title || 'TIC-80 官方完整版';
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - TIC-80 Console</title>
+  <title>${title}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
       height: 100%;
-      background: #090a0f;
-      color: #e2e8f0;
-      font-family: monospace;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #screen-frame {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      max-width: 760px;
-      height: 100%;
-      padding: 10px;
-    }
-
-    #canvas-wrapper {
-      position: relative;
-      border: 6px solid #1c2333;
-      border-radius: 8px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 20px rgba(115,239,247,0.15);
       background: #000;
-      image-rendering: pixelated;
+      color: #e2e8f0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+    }
+
+    #tic80-wrapper {
+      position: relative;
       width: 100%;
-      max-width: 720px;
-      aspect-ratio: 240 / 136;
+      height: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
-      overflow: hidden;
+      background: #000;
+      padding: 6px;
     }
 
-    canvas {
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      max-width: 820px;
+      aspect-ratio: 256 / 144;
+      max-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      border: 3px solid #141724;
+      border-radius: 4px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.9), 0 0 20px rgba(65, 166, 246, 0.2);
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
       display: block;
       image-rendering: pixelated;
-      background: #141724;
+      image-rendering: crisp-edges;
+      outline: none;
+      background: #000;
     }
 
-    #controls-hint {
-      margin-top: 8px;
-      display: flex;
-      gap: 16px;
-      font-size: 11px;
-      color: #73eff7;
-      text-shadow: 0 0 4px rgba(115,239,247,0.5);
-    }
-
-    .key-badge {
-      background: #141724;
-      border: 1px solid #232d44;
-      padding: 2px 6px;
-      border-radius: 3px;
-      color: #ffcd75;
-    }
-
-    #error-overlay {
-      display: none;
+    #loading-cover {
       position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(177, 62, 83, 0.95);
-      color: #fff;
-      padding: 6px 10px;
-      font-size: 11px;
-      line-height: 1.4;
-      max-height: 50%;
-      overflow-y: auto;
+      inset: 0;
+      background: #090a10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 50;
+      color: #73eff7;
+      font-family: monospace;
+      font-size: 13px;
+      transition: opacity 0.25s ease;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #232d44;
+      border-top-color: #73eff7;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #toast {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: rgba(32, 92, 99, 0.95);
+      border: 1px solid #73eff7;
+      color: #ffffff;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
       z-index: 100;
-      border-top: 2px solid #ef7d57;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
     }
   </style>
-  <script src="/tic80/vendor/fengari-web.js"></script>
 </head>
 <body>
-  <div id="screen-frame">
-    <div id="canvas-wrapper">
-      <canvas id="tic-canvas" width="240" height="136"></canvas>
-      <div id="error-overlay"></div>
-    </div>
-    <div id="controls-hint">
-      <span><span class="key-badge">方向键 / WASD</span> 移动</span>
-      <span><span class="key-badge">Z</span> A 键</span>
-      <span><span class="key-badge">X</span> B 键</span>
-      <span><span class="key-badge">A</span> X 键</span>
-      <span><span class="key-badge">S</span> Y 键</span>
+  <div id="tic80-wrapper">
+    <div class="canvas-container">
+      <div id="loading-cover">
+        <div class="spinner"></div>
+        <div>TIC-80 官方虚拟电脑启动中...</div>
+      </div>
+      <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+      <div id="toast">⚡ 热重载已同步</div>
     </div>
   </div>
 
   <script>
-    const canvas = document.getElementById('tic-canvas');
-    const ctx = canvas.getContext('2d');
-    const errOverlay = document.getElementById('error-overlay');
+    const initialCartText = ${cartTextJson};
+    const canvas = document.getElementById('canvas');
+    const loadingCover = document.getElementById('loading-cover');
+    const toast = document.getElementById('toast');
 
-    let initialCartText = ${cartTextJson};
-    let btnState = 0;
-    let btnPrevState = 0;
-    let isMuted = false;
+    function showToast(msg) {
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
 
-    // Palette (Default Sweetie-16)
-    let palette = [
-      [0x1a,0x1c,0x2c],[0x5d,0x27,0x5d],[0xb1,0x3e,0x53],[0xef,0x7d,0x57],
-      [0xff,0xcd,0x75],[0xa7,0xf0,0x70],[0x38,0xb7,0x64],[0x25,0x71,0x79],
-      [0x29,0x36,0x6f],[0x3b,0x5d,0xc9],[0x41,0xa6,0xf6],[0x73,0xef,0xf7],
-      [0xf4,0xf4,0xf4],[0x94,0xb0,0xc2],[0x56,0x6c,0x86],[0x33,0x3c,0x57]
-    ];
-    let sprites = new Uint8Array(512 * 64);
-    let mapData = new Uint8Array(240 * 136);
+    // Dispatch keyboard event to canvas and window for SDL
+    window.sendKey = function(key, code, keyCode, ctrl = false) {
+      canvas.focus();
+      const down = new KeyboardEvent('keydown', {
+        key: key,
+        code: code,
+        keyCode: keyCode,
+        which: keyCode,
+        ctrlKey: ctrl,
+        bubbles: true,
+        cancelable: true
+      });
+      canvas.dispatchEvent(down);
+      window.dispatchEvent(down);
 
-    // Web Audio
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = AudioCtx ? new AudioCtx() : null;
+      setTimeout(() => {
+        const up = new KeyboardEvent('keyup', {
+          key: key,
+          code: code,
+          keyCode: keyCode,
+          which: keyCode,
+          ctrlKey: ctrl,
+          bubbles: true,
+          cancelable: true
+        });
+        canvas.dispatchEvent(up);
+        window.dispatchEvent(up);
+      }, 50);
+    };
 
     window.addEventListener('message', (e) => {
-      if (e.data && e.data.type === 'TOGGLE_MUTE') {
-        isMuted = !isMuted;
+      if (!e.data) return;
+      if (e.data.type === 'SEND_KEY') {
+        window.sendKey(e.data.key, e.data.code, e.data.keyCode, e.data.ctrl);
+      } else if (e.data.type === 'RELOAD_CART') {
+        window.location.reload();
       }
     });
 
-    // Keyboard bindings
-    const keyMap = {
-      'ArrowUp': 0, 'KeyW': 0,
-      'ArrowDown': 1, 'KeyS': 1,
-      'ArrowLeft': 2, 'KeyA': 2,
-      'ArrowRight': 3, 'KeyD': 3,
-      'KeyZ': 4, 'KeyJ': 4,
-      'KeyX': 5, 'KeyK': 5,
-      'KeyA': 6,
-      'KeyS': 7
-    };
+    // Emscripten Module configuration for official TIC-80
+    var Module = {
+      canvas: canvas,
+      arguments: ['/game.lua', '--cmd=run'],
+      locateFile: function(path, prefix) {
+        if (path.endsWith('.wasm')) return '/tic80/vendor/tic80.wasm';
+        return prefix + path;
+      },
+      preRun: [
+        function(mod) {
+          mod.ENV = mod.ENV || {};
+          mod.ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
 
-    window.addEventListener('keydown', e => {
-      if (keyMap[e.code] !== undefined) {
-        btnState |= (1 << keyMap[e.code]);
-        e.preventDefault();
-      }
-    });
-
-    window.addEventListener('keyup', e => {
-      if (keyMap[e.code] !== undefined) {
-        btnState &= ~(1 << keyMap[e.code]);
-        e.preventDefault();
-      }
-    });
-
-    // TIC-80 Global Hardware APIs
-    window.TIC80 = {
-      cls(color = 0) {
-        const c = palette[color & 15] || palette[0];
-        ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.fillRect(0, 0, 240, 136);
-      },
-      pix(x, y, color) {
-        if (color !== undefined) {
-          const c = palette[color & 15] || palette[0];
-          ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-          ctx.fillRect(x | 0, y | 0, 1, 1);
-        }
-      },
-      line(x0, y0, x1, y1, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.strokeStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.beginPath();
-        ctx.moveTo((x0 | 0) + 0.5, (y0 | 0) + 0.5);
-        ctx.lineTo((x1 | 0) + 0.5, (y1 | 0) + 0.5);
-        ctx.stroke();
-      },
-      rect(x, y, w, h, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.fillRect(x | 0, y | 0, w | 0, h | 0);
-      },
-      rectb(x, y, w, h, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.strokeStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.strokeRect((x | 0) + 0.5, (y | 0) + 0.5, (w | 0) - 1, (h | 0) - 1);
-      },
-      circ(x, y, r, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.beginPath();
-        ctx.arc(x | 0, y | 0, Math.max(0, r | 0), 0, Math.PI * 2);
-        ctx.fill();
-      },
-      circb(x, y, r, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.strokeStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.beginPath();
-        ctx.arc(x | 0, y | 0, Math.max(0, r | 0), 0, Math.PI * 2);
-        ctx.stroke();
-      },
-      tri(x1, y1, x2, y2, x3, y3, color = 15) {
-        const c = palette[color & 15] || palette[15];
-        ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.beginPath();
-        ctx.moveTo(x1 | 0, y1 | 0);
-        ctx.lineTo(x2 | 0, y2 | 0);
-        ctx.lineTo(x3 | 0, y3 | 0);
-        ctx.closePath();
-        ctx.fill();
-      },
-      spr(id, x, y, colorkey = -1, scale = 1, flip = 0, rotate = 0, w = 1, h = 1) {
-        const sprStart = (id & 0x1ff) * 64;
-        for (let sy = 0; sy < 8 * h; sy++) {
-          for (let sx = 0; sx < 8 * w; sx++) {
-            const col = sprites[sprStart + sy * 8 + sx];
-            if (col !== undefined && col !== colorkey) {
-              const c = palette[col & 15];
-              ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-              ctx.fillRect((x + sx * scale) | 0, (y + sy * scale) | 0, scale, scale);
-            }
+          try {
+            mod.FS.writeFile('/game.lua', initialCartText);
+          } catch(err) {
+            console.error('Error writing /game.lua into MEMFS:', err);
           }
         }
-      },
-      mget(x, y) {
-        if (x < 0 || x >= 240 || y < 0 || y >= 136) return 0;
-        return mapData[(y | 0) * 240 + (x | 0)];
-      },
-      mset(x, y, val) {
-        if (x >= 0 && x < 240 && y >= 0 && y < 136) {
-          mapData[(y | 0) * 240 + (x | 0)] = val & 0xff;
-        }
-      },
-      map(x = 0, y = 0, w = 30, h = 17, sx = 0, sy = 0, colorkey = -1, scale = 1) {
-        for (let my = 0; my < h; my++) {
-          for (let mx = 0; mx < w; mx++) {
-            const tileId = this.mget(x + mx, y + my);
-            if (tileId !== 0) {
-              this.spr(tileId, sx + mx * 8 * scale, sy + my * 8 * scale, colorkey, scale);
-            }
+      ],
+      postRun: [
+        function() {
+          if (loadingCover) {
+            loadingCover.style.opacity = '0';
+            setTimeout(() => { loadingCover.style.display = 'none'; }, 250);
           }
+          canvas.focus();
         }
-      },
-      print(text, x = 0, y = 0, color = 15, fixed = false, scale = 1) {
-        const c = palette[color & 15] || palette[15];
-        ctx.fillStyle = \`rgb(\${c[0]},\${c[1]},\${c[2]})\`;
-        ctx.font = \`\${6 * scale}px monospace\`;
-        ctx.fillText(String(text), x, y + 6 * scale);
-        return String(text).length * 6 * scale;
-      },
-      btn(id) {
-        return (btnState & (1 << id)) !== 0;
-      },
-      btnp(id) {
-        return ((btnState & (1 << id)) !== 0) && ((btnPrevState & (1 << id)) === 0);
-      },
-      sfx(id) {
-        if (isMuted || !audioCtx) return;
-        try {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.frequency.setValueAtTime(440 + (id * 40), audioCtx.currentTime);
-          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.12);
-        } catch(e) {}
-      },
-      music() {},
-      time() {
-        return performance.now();
-      },
-      trace(msg) {
-        console.log('[TIC-80]', msg);
-      }
+      ]
     };
 
-    // WebSocket live hot reload connection
+    // WebSocket for Live Hot Reload from DSH tools
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = wsProtocol + '//' + window.location.host + '/tic80-ws';
     let ws = null;
 
     function connectWs() {
       ws = new WebSocket(wsUrl);
-      ws.onopen = () => console.log('[Studio] Connected to TIC-80 Live Hot Reload');
+      ws.onopen = () => console.log('[TIC-80 WASM] Connected to Live Hot-Reload');
       ws.onmessage = (evt) => {
         try {
           const data = JSON.parse(evt.data);
           if (data.type === 'HOT_RELOAD' || data.type === 'INIT_CART') {
-            console.log('[Studio] Hot-reload received:', data.updateType || 'ALL');
-            loadCartridge(data.cartText);
+            console.log('[TIC-80 WASM] Hot-reload received:', data.updateType || 'ALL');
+            showToast('⚡ 卡带热更新已生效 (' + (data.updateType || 'ALL') + ')');
+
+            if (Module && Module.FS && data.cartText) {
+              try {
+                Module.FS.writeFile('/game.lua', data.cartText);
+              } catch(e) {}
+            }
+
+            setTimeout(() => {
+              window.location.reload();
+            }, 300);
           }
         } catch(e) {
           console.error(e);
@@ -865,116 +864,8 @@ export class WebStudioServer {
       };
     }
     connectWs();
-
-    let luaLoaded = false;
-
-    function loadCartridge(text) {
-      errOverlay.style.display = 'none';
-
-      // Parse cartridge sections
-      const lines = text.split(/\\r?\\n/);
-      let inCode = true;
-      let currentTag = null;
-      let codeLines = [];
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        const tagOpen = trimmed.match(/^--\\s*<([A-Za-z0-9_]+)>/);
-        if (tagOpen) { inCode = false; currentTag = tagOpen[1].toUpperCase(); continue; }
-        const tagClose = trimmed.match(/^--\\s*<\\/([A-Za-z0-9_]+)>/);
-        if (tagClose) { currentTag = null; continue; }
-
-        if (inCode) {
-          if (!trimmed.startsWith('--')) codeLines.push(line);
-        } else if (currentTag === 'SPRITES' || currentTag === 'TILES') {
-          const m = trimmed.match(/^--\\s*(\\d+):([0-9a-fA-F]+)/);
-          if (m) {
-            const id = parseInt(m[1], 10);
-            const hex = m[2];
-            const offset = (currentTag === 'TILES' ? 0 : 256) * 64 + id * 64;
-            for (let i = 0; i < hex.length && i < 64; i++) {
-              sprites[offset + i] = parseInt(hex[i], 16);
-            }
-          }
-        }
-      }
-
-      const userLuaCode = codeLines.join('\\n');
-
-      if (window.fengari) {
-        try {
-          const fw = window.fengari;
-          const prelude = \`
-            local js = require "js"
-            local T = js.global.TIC80
-
-            cls = function(c) T:cls(c or 0) end
-            pix = function(x, y, c) T:pix(x or 0, y or 0, c) end
-            line = function(x0, y0, x1, y1, c) T:line(x0 or 0, y0 or 0, x1 or 0, y1 or 0, c or 15) end
-            rect = function(x, y, w, h, c) T:rect(x or 0, y or 0, w or 0, h or 0, c or 15) end
-            rectb = function(x, y, w, h, c) T:rectb(x or 0, y or 0, w or 0, h or 0, c or 15) end
-            circ = function(x, y, r, c) T:circ(x or 0, y or 0, r or 0, c or 15) end
-            circb = function(x, y, r, c) T:circb(x or 0, y or 0, r or 0, c or 15) end
-            tri = function(x1, y1, x2, y2, x3, y3, c) T:tri(x1, y1, x2, y2, x3, y3, c or 15) end
-            spr = function(id, x, y, colorkey, scale, flip, rotate, w, h)
-              T:spr(id, x, y, colorkey or -1, scale or 1, flip or 0, rotate or 0, w or 1, h or 1)
-            end
-            mget = function(x, y) return T:mget(x or 0, y or 0) end
-            mset = function(x, y, val) T:mset(x or 0, y or 0, val or 0) end
-            map = function(x, y, w, h, sx, sy, colorkey, scale, remap)
-              T:map(x or 0, y or 0, w or 30, h or 17, sx or 0, sy or 0, colorkey or -1, scale or 1)
-            end
-            btn = function(id) return T:btn(id or 0) end
-            btnp = function(id) return T:btnp(id or 0) end
-            sfx = function(id, note, duration, channel, volume, speed)
-              T:sfx(id or 0, note or -1, duration or -1, channel or 0, volume or 15, speed or 0)
-            end
-            music = function(track, frame, row, loop)
-              T:music(track or -1, frame or -1, row or -1, loop or true)
-            end
-            time = function() return T:time() end
-            trace = function(msg) T:trace(tostring(msg)) end
-            print = function(str, x, y, color, fixed, scale)
-              return T:print(tostring(str or ""), x or 0, y or 0, color or 15, fixed or false, scale or 1)
-            end
-          \`;
-
-          // Execute prelude and user Lua script
-          fw.load(prelude)();
-          fw.load(userLuaCode)();
-
-          // Execute BOOT if available
-          fw.load("if type(BOOT) == 'function' then BOOT() end")();
-          luaLoaded = true;
-        } catch (err) {
-          console.error('Lua Compilation Error:', err);
-          showError(err.message || String(err));
-        }
-      }
-    }
-
-    function showError(msg) {
-      errOverlay.style.display = 'block';
-      errOverlay.textContent = '❌ [TIC-80 LUA ERROR] ' + msg;
-    }
-
-    loadCartridge(initialCartText);
-
-    // 60 FPS Animation Frame Loop
-    function gameLoop() {
-      if (luaLoaded && window.fengari) {
-        try {
-          window.fengari.load("if type(TIC) == 'function' then TIC() end")();
-        } catch(e) {
-          showError(e.message || String(e));
-        }
-      }
-
-      btnPrevState = btnState;
-      requestAnimationFrame(gameLoop);
-    }
-    requestAnimationFrame(gameLoop);
   </script>
+  <script src="/tic80/vendor/tic80.js"></script>
 </body>
 </html>`;
   }

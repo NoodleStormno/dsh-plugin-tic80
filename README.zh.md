@@ -24,8 +24,8 @@
   - 内置智能 Linter 静态分析引擎，实时检测 Lua 语法、`TIC()` 主循环合规性、512KB 内存限制与越界调用。
 - 🚀 **内置嵌入式 UI 与实时热重载**：
   - **DSH 内嵌三栏工作台**：TIC-80 虚拟游戏机直接潜入 DeepSeek Harness Web 页面（左侧为 DSH 侧边栏，**中间栏为 TIC-80 游戏机屏幕**，右侧为 AI 对话栏），无需在多个窗口来回切换。
-  - **开箱即用空白卡带**：预置 `cartridge/game.lua` 现成可运行模板并已完整注入 System Prompt，LLM 零等待、第 1 轮对话即可直接编写游戏代码与素材，无需花费轮次重新建工程。
-  - **Web Live Studio**：内置 Fengari Lua 5.3 引擎与 WebSocket 实时热更新，LLM 或用户修改任意代码、精灵、地图或音效，中间屏幕即时响应。
+  - **官方原生 TIC-80 WebAssembly 引擎与工作台**：采用官方原版编译的 TIC-80 WebAssembly 控制台（基于 Emscripten 与 SDL2），100% 保留经典复古 CRT 显示效果、真实命令行 CLI 终端与官方全套内置编辑器（`F1` 代码编辑器、`F2` 精灵像素画、`F3` 世界地图、`F4` 音效合成器、`F5` 音乐音轨 Tracker、`Ctrl+R` 运行游戏、`Esc` 退出到终端）。
+  - **实时 WebSocket 热重载**：LLM 或用户通过模型工具修改任意代码、精灵、地图或音效后，中间栏 TIC-80 屏幕即时重新载入卡带并无缝生效。
   - **Native Desktop Runner**：无缝对接本地 `tic80.exe` 桌面版，支持 Headless CLI 测试与全屏运行。
 - 📦 **多格式导出**：
   - 一键导出 `.lua` 源码卡带、`.tic` 二进制 ROM、单文件独立运行的 `.html` 网页游戏。

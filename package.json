@@ -10,6 +10,14 @@
     "test": "node --test lib/test/**/*.test.js",
     "prepublishOnly": "npm run build && npm test"
   },
+  "files": [
+    "lib",
+    "vendor/tic80-web",
+    "cartridge",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
   "keywords": [
     "dsh-plugin",
     "cordis-plugin",
