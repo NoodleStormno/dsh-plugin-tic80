@@ -14,6 +14,9 @@ import { Cartridge } from './core/cartridge.js';
 import { createTemplate } from './templates/index.js';
 import { WebStudioServer } from './runner/web-runner.js';
 import { createTic80Tools, ToolContext } from './tools/index.js';
+import { buildStudioSystemPrompt, TIC80_SYSTEM_PROMPT } from './prompts/index.js';
+
+export { buildStudioSystemPrompt, TIC80_SYSTEM_PROMPT };
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -94,19 +97,10 @@ export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
         order,
         text: () => {
           const cartCode = toolCtx.cartridge.toText();
-          return [
-            '## 🎮 TIC-80 Embedded Workspace & Real-Time Studio',
-            '- The TIC-80 virtual fantasy console is EMBEDDED DIRECTLY IN THE MIDDLE COLUMN of the user interface (240x136 @ 60 FPS, Sweetie-16).',
-            '- The active cartridge is ALREADY RUNNING at `' + defaultCartPath + '`.',
-            '- DO NOT run `tic80_init` or `tic80_get_cart` to initialize or inspect the project — everything is already initialized and live.',
-            '- In Turn 1, IMMEDIATELY call `tic80_set_code`, `tic80_edit_sprite`, `tic80_create_sfx`, or `tic80_edit_map` to fulfill the user\'s game request.',
-            '- Edits made via tools hot-reload immediately into the middle-column game console via WebSocket.',
-            '',
-            '### 📜 Current Active Cartridge Template (Loaded):',
-            '```lua',
+          return buildStudioSystemPrompt({
+            cartPath: defaultCartPath,
             cartCode,
-            '```',
-          ].join('\n');
+          });
         }
       });
     } catch {

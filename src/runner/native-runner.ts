@@ -8,7 +8,11 @@
 import { spawn, execSync, ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Cartridge } from '../core/cartridge.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export interface NativeRunOptions {
   tic80Path?: string;
@@ -36,8 +40,11 @@ export class NativeRunner {
     const candidatePaths = [
       path.resolve(process.cwd(), 'tic80.exe'),
       path.resolve('E:/dsh-plugin-tic80/tic80.exe'),
-      'C:/Users/w2578/Downloads/tic80.exe',
+      path.resolve('E:/dsh-plugin-tic80/vendor/bin/tic80.exe'),
+      path.resolve(__dirname, '../../vendor/bin/tic80.exe'),
+      path.resolve(__dirname, '../../tic80.exe'),
       'C:/Program Files/TIC-80/tic80.exe',
+      'C:/Users/w2578/Downloads/tic80.exe',
     ];
 
     for (const p of candidatePaths) {

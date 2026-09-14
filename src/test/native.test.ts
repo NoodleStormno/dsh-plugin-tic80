@@ -23,6 +23,26 @@ describe('TIC-80 Native Runner CLI Integration', () => {
     });
 
     assert.strictEqual(res.success, true);
+    assert.ok(!res.stderr.includes('TIC-80 PRO is needed for text files'), 'PRO version must support .lua text carts without pro restriction error');
     await fs.rm(tempCartPath, { force: true });
+  });
+
+  test('verifies TIC-80 PRO executes .lua cartridge and exports .tic', async () => {
+    const tempCartPath = path.resolve('E:/dsh-plugin-tic80/test_pro_load.lua');
+    const tempTicPath = path.resolve('E:/dsh-plugin-tic80/test_pro_out.tic');
+    const cart = new Cartridge();
+    cart.code = `function TIC()\n  trace("PRO_LUA_OK")\n  exit()\nend\n`;
+    await fs.writeFile(tempCartPath, cart.toText(), 'utf8');
+
+    const res = await NativeRunner.run({
+      cartPath: tempCartPath,
+      cli: true,
+      commands: [`save ${tempTicPath}`, 'exit'],
+      timeoutMs: 4000,
+    });
+
+    assert.strictEqual(res.success, true);
+    await fs.rm(tempCartPath, { force: true });
+    await fs.rm(tempTicPath, { force: true });
   });
 });
