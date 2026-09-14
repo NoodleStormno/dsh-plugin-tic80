@@ -110,6 +110,32 @@ end
     assert.strictEqual(toolCtx.cartridge.map.getTile(10, 10), 2);
   });
 
+  test('tic80_edit_map handles nested fillRect coordinates and aliases', async () => {
+    const editMapTool = toolMap.get('tic80_edit_map')!;
+    const res: any = await editMapTool.execute({
+      fillRect: { x: 5, y: 15, width: 10, height: 2, tileId: 8 },
+    }, {} as any);
+
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(toolCtx.cartridge.map.getTile(5, 15), 8);
+    assert.strictEqual(toolCtx.cartridge.map.getTile(14, 16), 8);
+    assert.strictEqual(toolCtx.cartridge.map.getTile(4, 15), 0);
+    assert.ok(res.preview.length > 0);
+  });
+
+  test('tic80_edit_map places batch tiles and converts pixel coordinates', async () => {
+    const editMapTool = toolMap.get('tic80_edit_map')!;
+    const res: any = await editMapTool.execute({
+      unit: 'pixels',
+      tiles: [
+        { x: 16, y: 24, tileId: 9 }, // 16px -> col 2, 24px -> row 3
+      ],
+    }, {} as any);
+
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(toolCtx.cartridge.map.getTile(2, 3), 9);
+  });
+
   test('tic80_create_sfx synthesizes sound effect', async () => {
     const sfxTool = toolMap.get('tic80_create_sfx')!;
     const res: any = await sfxTool.execute({

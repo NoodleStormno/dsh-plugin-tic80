@@ -12,16 +12,34 @@ export class WorldMap {
   private tiles: Uint8Array = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
 
   getTile(x: number, y: number): number {
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return 0;
     return this.tiles[y * MAP_WIDTH + x];
   }
 
   setTile(x: number, y: number, tileId: number) {
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (x < 0 || x >= MAP_WIDTH || y < 0 || y >= MAP_HEIGHT) return;
     this.tiles[y * MAP_WIDTH + x] = tileId & 0xff;
   }
 
   fillRect(x: number, y: number, w: number, h: number, tileId: number) {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    w = Math.floor(w);
+    h = Math.floor(h);
+
+    if (w < 0) {
+      x = x + w + 1;
+      w = -w;
+    }
+    if (h < 0) {
+      y = y + h + 1;
+      h = -h;
+    }
+
     for (let r = 0; r < h; r++) {
       const cy = y + r;
       if (cy < 0 || cy >= MAP_HEIGHT) continue;
@@ -34,6 +52,13 @@ export class WorldMap {
   }
 
   copyRect(srcX: number, srcY: number, w: number, h: number, dstX: number, dstY: number) {
+    srcX = Math.floor(srcX);
+    srcY = Math.floor(srcY);
+    w = Math.floor(w);
+    h = Math.floor(h);
+    dstX = Math.floor(dstX);
+    dstY = Math.floor(dstY);
+
     const temp = new Uint8Array(w * h);
     for (let r = 0; r < h; r++) {
       for (let c = 0; c < w; c++) {
@@ -49,39 +74,49 @@ export class WorldMap {
 
   /**
    * Load map area from an ASCII diagram.
-   * Example:
-   *   ########
-   *   #......#
-   *   #..P...#
-   *   ########
-   * legend: { '#': 1, '.': 0, 'P': 2 }
+   * Preserves column indentation (spaces) and row positions without destructive trimming.
    */
   loadFromAscii(
     startX: number,
     startY: number,
     asciiRows: string[] | string,
     legend: Record<string, number>
-  ): { width: number; height: number } {
-    const rows = Array.isArray(asciiRows) ? asciiRows : asciiRows.trim().split(/\r?\n/);
-    const cleaned = rows.map(r => r.trim()).filter(r => r.length > 0);
-    if (cleaned.length === 0) return { width: 0, height: 0 };
+  ): { width: number; height: number; startX: number; startY: number } {
+    startX = Math.floor(startX);
+    startY = Math.floor(startY);
 
-    const height = cleaned.length;
-    const width = Math.max(...cleaned.map(r => r.length));
+    let rows: string[];
+    if (Array.isArray(asciiRows)) {
+      rows = asciiRows.map(String);
+    } else {
+      const raw = String(asciiRows).split(/\r?\n/);
+      // Remove only initial/trailing empty newline rows
+      while (raw.length > 0 && raw[0].trim().length === 0) raw.shift();
+      while (raw.length > 0 && raw[raw.length - 1].trim().length === 0) raw.pop();
+      rows = raw;
+    }
+    if (rows.length === 0) return { width: 0, height: 0, startX, startY };
+
+    const height = rows.length;
+    const width = Math.max(...rows.map(r => r.length));
 
     for (let r = 0; r < height; r++) {
       const y = startY + r;
+      if (y < 0) continue;
       if (y >= MAP_HEIGHT) break;
-      for (let c = 0; c < cleaned[r].length; c++) {
+      const rowStr = rows[r];
+      for (let c = 0; c < rowStr.length; c++) {
         const x = startX + c;
+        if (x < 0) continue;
         if (x >= MAP_WIDTH) break;
-        const ch = cleaned[r][c];
-        const tileId = legend[ch] !== undefined ? legend[ch] : 0;
-        this.setTile(x, y, tileId);
+        const ch = rowStr[c];
+        if (legend[ch] !== undefined) {
+          this.setTile(x, y, legend[ch]);
+        }
       }
     }
 
-    return { width, height };
+    return { width, height, startX, startY };
   }
 
   /**
@@ -131,7 +166,11 @@ export class WorldMap {
       for (let x = 0; x < MAP_WIDTH; x++) {
         const tile = this.tiles[rowStart + x];
         if (tile !== 0) hasData = true;
-        hex += tile.toString(16).padStart(2, '0');
+        // In TIC-80 official specification (BinarySections[MAP].flip = true):
+        // Low nibble is output first, followed by high nibble
+        const low = (tile & 0x0f).toString(16);
+        const high = ((tile >> 4) & 0x0f).toString(16);
+        hex += low + high;
       }
       if (hasData) {
         const rowStr = y.toString().padStart(3, '0');
@@ -150,7 +189,10 @@ export class WorldMap {
 
     const rowStart = y * MAP_WIDTH;
     for (let i = 0; i < hex.length && (i / 2) < MAP_WIDTH; i += 2) {
-      const tileId = parseInt(hex.substring(i, i + 2), 16);
+      // In TIC-80 official specification: first hex character is low nibble, second is high nibble
+      const low = parseInt(hex[i], 16);
+      const high = parseInt(hex[i + 1] || '0', 16);
+      const tileId = (high << 4) | low;
       this.tiles[rowStart + Math.floor(i / 2)] = tileId;
     }
   }

@@ -303,20 +303,34 @@ export function createTic80Tools(toolCtx: ToolContext) {
   // 6. tic80_edit_map
   tools.push(defineTool({
     name: 'tic80_edit_map',
-    description: 'Edit the 240x136 TIC-80 world map by setting tiles, filling rectangles, or loading ASCII map diagrams.',
+    description: 'Edit the 240x136 TIC-80 world map by setting tiles, filling rectangles, placing batch tiles, or loading ASCII diagrams. Tile grid: 240 cols x 136 rows. Screen 0 is (0..29, 0..16). 1 tile = 8x8 pixels.',
     parameters: {
-      x: { type: 'integer', description: 'X coordinate (0-239)' },
-      y: { type: 'integer', description: 'Y coordinate (0-135)' },
-      tileId: { type: 'integer', description: 'Tile ID to place at (x, y)' },
+      x: { type: 'number', description: 'Tile X coordinate (0-239, default 0). For Screen 0: 0-29. In pixels if unit="pixels".' },
+      y: { type: 'number', description: 'Tile Y coordinate (0-135, default 0). For Screen 0: 0-16. In pixels if unit="pixels".' },
+      tileId: { type: 'integer', description: 'Tile ID (0-255) to place at (x, y).' },
+      tiles: {
+        type: 'array',
+        description: 'Batch tiles to set: [{ x, y, tileId }] or [[x, y, tileId]].',
+        items: { type: 'object', additionalProperties: true },
+      },
       fillRect: {
         type: 'object',
-        description: 'Fill rectangle: { w: number, h: number, tileId: number }',
+        description: 'Fill rectangle or array of rectangles: { x?, y?, w, h, tileId } (aliases: startX, startY, width, height, tile). Coordinates default to top-level x, y if omitted.',
         additionalProperties: true,
       },
       asciiMap: {
         type: 'object',
-        description: 'Load diagram: { asciiRows: string, legend: { "#": 1, ".": 0 } }',
+        description: 'Load diagram: { x?, y?, asciiRows: string | string[], legend: { "#": 1, ".": 0 } }',
         additionalProperties: true,
+      },
+      unit: {
+        type: 'string',
+        enum: ['tiles', 'pixels'],
+        description: 'Coordinate unit: "tiles" (default, 1 tile = 8x8 px) or "pixels" (auto-divided by 8).',
+      },
+      clear: {
+        type: 'boolean',
+        description: 'If true, clears the entire map with tile 0 before applying edits.',
       },
     },
     output: {
@@ -325,31 +339,155 @@ export function createTic80Tools(toolCtx: ToolContext) {
     },
     async execute(args): Promise<any> {
       const map = toolCtx.cartridge.map;
-      const x = args.x || 0;
-      const y = args.y || 0;
+      const isPixels = args.unit === 'pixels' || (args as any).pixelCoords === true;
 
-      if (args.tileId !== undefined) {
-        map.setTile(x, y, args.tileId);
+      const toTileCoord = (val: any, defaultVal = 0): number => {
+        if (val === undefined || val === null) return defaultVal;
+        const num = Number(val);
+        if (isNaN(num)) return defaultVal;
+        return isPixels ? Math.floor(num / 8) : Math.floor(num);
+      };
+
+      const toTileDim = (val: any, defaultVal = 1): number => {
+        if (val === undefined || val === null) return defaultVal;
+        const num = Number(val);
+        if (isNaN(num)) return defaultVal;
+        return isPixels ? Math.max(1, Math.round(num / 8)) : Math.floor(num);
+      };
+
+      if (args.clear) {
+        map.fillRect(0, 0, 240, 136, 0);
       }
 
+      // Resolve top-level coordinates (if specified)
+      const hasTopX = args.x !== undefined || (args as any).tileX !== undefined || (args as any).col !== undefined || (args as any).column !== undefined || (args as any).startX !== undefined;
+      const hasTopY = args.y !== undefined || (args as any).tileY !== undefined || (args as any).row !== undefined || (args as any).startY !== undefined;
+      const topX = hasTopX ? toTileCoord(args.x ?? (args as any).tileX ?? (args as any).col ?? (args as any).column ?? (args as any).startX, 0) : undefined;
+      const topY = hasTopY ? toTileCoord(args.y ?? (args as any).tileY ?? (args as any).row ?? (args as any).startY, 0) : undefined;
+
+      let minX = 240, maxX = -1, minY = 136, maxY = -1;
+      let tilesPlaced = 0;
+
+      const recordBounds = (x: number, y: number, w: number = 1, h: number = 1) => {
+        const x1 = Math.min(x, x + w - 1);
+        const x2 = Math.max(x, x + w - 1);
+        const y1 = Math.min(y, y + h - 1);
+        const y2 = Math.max(y, y + h - 1);
+        minX = Math.min(minX, Math.max(0, x1));
+        maxX = Math.max(maxX, Math.min(239, x2));
+        minY = Math.min(minY, Math.max(0, y1));
+        maxY = Math.max(maxY, Math.min(135, y2));
+      };
+
+      // 1. Single tile placement
+      if (args.tileId !== undefined || (args as any).tile !== undefined) {
+        const tx = topX ?? 0;
+        const ty = topY ?? 0;
+        const tid = (args.tileId ?? (args as any).tile) & 0xff;
+        map.setTile(tx, ty, tid);
+        recordBounds(tx, ty, 1, 1);
+        tilesPlaced++;
+      }
+
+      // 2. Batch tiles array
+      if (Array.isArray(args.tiles)) {
+        for (const rawItem of (args.tiles as any[])) {
+          if (Array.isArray(rawItem)) {
+            const tx = toTileCoord(rawItem[0], topX ?? 0);
+            const ty = toTileCoord(rawItem[1], topY ?? 0);
+            const tid = Number(rawItem[2] ?? 0) & 0xff;
+            map.setTile(tx, ty, tid);
+            recordBounds(tx, ty, 1, 1);
+            tilesPlaced++;
+          } else if (typeof rawItem === 'object' && rawItem !== null) {
+            const item = rawItem as any;
+            const ix = item.x ?? item.tileX ?? item.col ?? item.column ?? topX ?? 0;
+            const iy = item.y ?? item.tileY ?? item.row ?? topY ?? 0;
+            const tx = toTileCoord(ix, topX ?? 0);
+            const ty = toTileCoord(iy, topY ?? 0);
+            const tid = Number(item.tileId ?? item.tile ?? item.id ?? 0) & 0xff;
+            map.setTile(tx, ty, tid);
+            recordBounds(tx, ty, 1, 1);
+            tilesPlaced++;
+          }
+        }
+      }
+
+      // 3. fillRect (support single object or array of objects)
       if (args.fillRect) {
-        const fr = args.fillRect as any;
-        map.fillRect(x, y, fr.w || 1, fr.h || 1, fr.tileId || 0);
+        const rectList = Array.isArray(args.fillRect) ? args.fillRect : [args.fillRect];
+        for (const frItem of rectList) {
+          if (typeof frItem !== 'object' || frItem === null) continue;
+          const fr = frItem as any;
+          const rx = fr.x ?? fr.tileX ?? fr.col ?? fr.column ?? fr.startX ?? topX ?? 0;
+          const ry = fr.y ?? fr.tileY ?? fr.row ?? fr.startY ?? topY ?? 0;
+          const tx = toTileCoord(rx, 0);
+          const ty = toTileCoord(ry, 0);
+
+          let w: number;
+          if (fr.w !== undefined || fr.width !== undefined || fr.cols !== undefined) {
+            w = toTileDim(fr.w ?? fr.width ?? fr.cols, 1);
+          } else if (fr.x2 !== undefined || fr.endX !== undefined || fr.right !== undefined) {
+            const ex = toTileCoord(fr.x2 ?? fr.endX ?? fr.right, tx);
+            w = ex >= tx ? ex - tx + 1 : ex - tx - 1;
+          } else {
+            w = 1;
+          }
+
+          let h: number;
+          if (fr.h !== undefined || fr.height !== undefined || fr.rows !== undefined) {
+            h = toTileDim(fr.h ?? fr.height ?? fr.rows, 1);
+          } else if (fr.y2 !== undefined || fr.endY !== undefined || fr.bottom !== undefined) {
+            const ey = toTileCoord(fr.y2 ?? fr.endY ?? fr.bottom, ty);
+            h = ey >= ty ? ey - ty + 1 : ey - ty - 1;
+          } else {
+            h = 1;
+          }
+
+          const tid = Number(fr.tileId ?? fr.tile ?? fr.id ?? 0) & 0xff;
+          map.fillRect(tx, ty, w, h, tid);
+          recordBounds(tx, ty, w, h);
+          tilesPlaced += Math.abs(w * h);
+        }
       }
 
+      // 4. asciiMap
       if (args.asciiMap) {
-        const am = args.asciiMap as any;
-        if (am.asciiRows && am.legend) {
-          map.loadFromAscii(x, y, am.asciiRows, am.legend);
+        const amList = Array.isArray(args.asciiMap) ? args.asciiMap : [args.asciiMap];
+        for (const amItem of amList) {
+          if (typeof amItem !== 'object' || amItem === null) continue;
+          const am = amItem as any;
+          const ax = am.x ?? am.tileX ?? am.col ?? am.column ?? am.startX ?? topX ?? 0;
+          const ay = am.y ?? am.tileY ?? am.row ?? am.startY ?? topY ?? 0;
+          const tx = toTileCoord(ax, 0);
+          const ty = toTileCoord(ay, 0);
+          const rows = am.asciiRows ?? am.rows ?? am.diagram;
+          const legend = am.legend ?? am.mapping;
+          if (rows && legend) {
+            const res = map.loadFromAscii(tx, ty, rows, legend);
+            recordBounds(res.startX, res.startY, res.width, res.height);
+            tilesPlaced += res.width * res.height;
+          }
         }
       }
 
       await syncChanges('MAP');
 
+      // Smart preview: calculate 30x17 screen view containing modified area
+      const focusX = minX <= maxX ? minX : (topX ?? 0);
+      const focusY = minY <= maxY ? minY : (topY ?? 0);
+      const screenCol = Math.floor(Math.max(0, focusX) / 30);
+      const screenRow = Math.floor(Math.max(0, focusY) / 17);
+      const previewX = Math.max(0, Math.min(210, screenCol * 30));
+      const previewY = Math.max(0, Math.min(119, screenRow * 17));
+
       return JSON.parse(JSON.stringify({
         success: true,
-        message: 'Map updated.',
-        preview: map.toAscii(x, y, 20, 10),
+        message: `Map updated (${tilesPlaced} tiles placed/filled).`,
+        screen: { col: screenCol, row: screenRow },
+        bounds: minX <= maxX ? { minX, minY, maxX, maxY } : undefined,
+        previewScreen: { x: previewX, y: previewY, w: 30, h: 17 },
+        preview: map.toAscii(previewX, previewY, 30, 17),
       }));
     },
   }));
