@@ -24,18 +24,16 @@ describe('TIC-80 Web Runner & WASM Server', () => {
     assert.ok(html.includes('cart.tic'), 'Should configure cartridge cart.tic');
   });
 
-  it('injects official TIC-80 studio buttons into DSH index.html', () => {
+  it('injects official TIC-80 studio pane with cartridge name into DSH index.html', () => {
     const server = new WebStudioServer();
     const baseHtml = '<html><head></head><body><div class="pI_x6G_centerCol"></div></body></html>';
     const injected = server.injectStudioIntoHtml(baseHtml);
 
-    assert.ok(injected.includes('btn-tic-esc'), 'Should include Esc CLI button');
-    assert.ok(injected.includes('btn-tic-f1'), 'Should include F1 Code button');
-    assert.ok(injected.includes('btn-tic-f2'), 'Should include F2 Sprite button');
-    assert.ok(injected.includes('btn-tic-f3'), 'Should include F3 Map button');
-    assert.ok(injected.includes('btn-tic-f4'), 'Should include F4 SFX button');
-    assert.ok(injected.includes('btn-tic-f5'), 'Should include F5 Music button');
-    assert.ok(injected.includes('btn-tic-run'), 'Should include Run button');
+    assert.ok(injected.includes('tic80-pane'), 'Should include TIC-80 pane');
+    assert.ok(injected.includes('id="tic80-header"'), 'Should include TIC-80 header');
+    assert.ok(injected.includes('id="tic80-cart-name"'), 'Should include cartridge name in header');
+    assert.ok(!injected.includes('btn-tic-f1'), 'Header should not include redundant F1-F5 switching buttons');
+    assert.ok(!injected.includes('btn-tic-esc'), 'Header should not include redundant Esc switching button');
   });
 
   it('starts standalone server and serves official WASM binary', async () => {

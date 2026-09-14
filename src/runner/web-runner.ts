@@ -345,13 +345,13 @@ export class WebStudioServer {
   }
 
   #tic80-header {
-    height: 42px !important;
-    min-height: 42px !important;
+    height: 38px !important;
+    min-height: 38px !important;
     background: #12141d !important;
     border-bottom: 1px solid #212534 !important;
     display: flex !important;
     align-items: center !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
     padding: 0 14px !important;
     color: #e2e8f0 !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
@@ -390,46 +390,6 @@ export class WebStudioServer {
   @keyframes tic80-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.5; transform: scale(0.85); }
-  }
-
-  .tic80-header-right {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
-  }
-  .tic80-header-right::-webkit-scrollbar { display: none; }
-
-  .tic80-btn {
-    background: #181d2c !important;
-    color: #cbd5e1 !important;
-    border: 1px solid #2b334a !important;
-    border-radius: 5px !important;
-    padding: 3px 8px !important;
-    font-size: 11px !important;
-    white-space: nowrap !important;
-    cursor: pointer !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    transition: all 0.15s ease !important;
-    flex-shrink: 0 !important;
-  }
-
-  .tic80-btn:hover {
-    background: #232b40 !important;
-    color: #ffffff !important;
-    border-color: #41a6f6 !important;
-  }
-
-  .tic80-btn-primary {
-    background: #205c63 !important;
-    color: #e0f7fa !important;
-    border-color: #38a5b0 !important;
-  }
-  .tic80-btn-primary:hover {
-    background: #28727a !important;
   }
 
   #tic80-viewport {
@@ -513,28 +473,16 @@ export class WebStudioServer {
         cachedPane.innerHTML = \`
           <div id="tic80-header">
             <div class="tic80-header-left">
-              <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80 官方完整版</span>
-              <span style="color:#94a3b8; font-size:12px; font-family:monospace;">game.lua</span>
-            </div>
-            <div class="tic80-header-right">
-              <button class="tic80-btn" id="btn-tic-esc" title="切换到控制台终端命令行 (Esc)">🖥️ 终端 (Esc)</button>
-              <button class="tic80-btn" id="btn-tic-f1" title="切换到代码编辑器 (F1)">📝 代码 (F1)</button>
-              <button class="tic80-btn" id="btn-tic-f2" title="切换到精灵/图块编辑器 (F2)">🎨 精灵 (F2)</button>
-              <button class="tic80-btn" id="btn-tic-f3" title="切换到地图编辑器 (F3)">🗺️ 地图 (F3)</button>
-              <button class="tic80-btn" id="btn-tic-f4" title="切换到音效编辑器 (F4)">🔊 音效 (F4)</button>
-              <button class="tic80-btn" id="btn-tic-f5" title="切换到音乐Tracker (F5)">🎵 音乐 (F5)</button>
-              <button class="tic80-btn tic80-btn-primary" id="btn-tic-run" title="运行/恢复游戏 (Ctrl+R / F11)">▶️ 运行 (Ctrl+R)</button>
-              <button class="tic80-btn" id="btn-tic-restart" title="重启并重新加载卡带">🔄 重置</button>
-              <button class="tic80-btn" id="btn-tic-export" title="导出 .TIC 独立文件">💾 导出 .TIC</button>
-              <button class="tic80-btn" id="btn-tic-popout" title="新标签页打开">🗔 弹窗</button>
+              <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80</span>
+              <span id="tic80-cart-name" style="color:#e2e8f0; font-size:12px; font-weight:600; font-family:monospace;">game.lua</span>
             </div>
           </div>
           <div id="tic80-viewport">
             <iframe id="tic80-iframe" src="/tic80/" allow="autoplay"></iframe>
           </div>
           <div id="tic80-footer">
-            <span>🎮 官方 TIC-80 虚拟电脑 | CLI 命令行 | F1代码 F2精灵 F3地图 F4音效 F5音乐</span>
-            <span>⚡ Esc 终端 | Ctrl+R 运行 | 方向键 / WASD 移动 | Z / X 交互</span>
+            <span>🎮 TIC-80 虚拟电脑 | Esc 终端 | F1代码 F2精灵 F3地图 F4音效 F5音乐</span>
+            <span>⚡ 方向键 / WASD 移动 | Z / X 交互 | Ctrl+R 运行</span>
           </div>
         \`;
 
@@ -542,38 +490,7 @@ export class WebStudioServer {
         cachedSplitter = document.createElement('div');
         cachedSplitter.id = 'tic80-splitter';
 
-        // 3. Wire control buttons
-        const sendKeyMsg = (key, code, keyCode, ctrl = false) => {
-          const iframe = document.getElementById('tic80-iframe');
-          if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ type: 'SEND_KEY', key, code, keyCode, ctrl }, '*');
-          }
-        };
-
-        cachedPane.querySelector('#btn-tic-esc').onclick = () => sendKeyMsg('Escape', 'Escape', 27);
-        cachedPane.querySelector('#btn-tic-f1').onclick = () => sendKeyMsg('F1', 'F1', 112);
-        cachedPane.querySelector('#btn-tic-f2').onclick = () => sendKeyMsg('F2', 'F2', 113);
-        cachedPane.querySelector('#btn-tic-f3').onclick = () => sendKeyMsg('F3', 'F3', 114);
-        cachedPane.querySelector('#btn-tic-f4').onclick = () => sendKeyMsg('F4', 'F4', 115);
-        cachedPane.querySelector('#btn-tic-f5').onclick = () => sendKeyMsg('F5', 'F5', 116);
-        cachedPane.querySelector('#btn-tic-run').onclick = () => sendKeyMsg('r', 'KeyR', 82, true);
-
-        cachedPane.querySelector('#btn-tic-restart').onclick = () => {
-          const iframe = document.getElementById('tic80-iframe');
-          if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({ type: 'RELOAD_CART' }, '*');
-          }
-        };
-
-        cachedPane.querySelector('#btn-tic-export').onclick = () => {
-          window.open('/tic80/cart.tic?download=1', '_blank');
-        };
-
-        cachedPane.querySelector('#btn-tic-popout').onclick = () => {
-          window.open('/tic80/', '_blank');
-        };
-
-        // 4. Drag Resizer
+        // 3. Drag Resizer
         let isDragging = false;
         cachedSplitter.onmousedown = (e) => {
           isDragging = true;

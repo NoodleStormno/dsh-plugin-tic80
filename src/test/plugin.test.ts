@@ -43,6 +43,8 @@ describe('Cordis Plugin Lifecycle', () => {
     assert.ok(prompt.includes('### 8. Sokoban Example'), 'Prompt must contain Section 8 Sokoban Example');
     assert.ok(prompt.includes('### 9. Platformer Example'), 'Prompt must contain Section 9 Platformer Example');
     assert.ok(prompt.includes('### 10. Key Directives'), 'Prompt must contain Section 10 Key Directives');
+    assert.ok(prompt.includes('NO OS LIBRARY'), 'Prompt must explicitly instruct that os library does not exist');
+    assert.ok(prompt.includes('nil'), 'Prompt must warn against nil value errors when indexing os');
     assert.ok(prompt.includes('E:/dsh-plugin-tic80/cartridge/game.lua'), 'Prompt must bind active cartridge path');
   });
 });
