@@ -1,0 +1,66 @@
+{
+  "name": "dsh-plugin-tic80",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness (dsh) plugin for TIC-80 fantasy console: full console capabilities, conversational code, music, map, and sprite generation by LLM, with native & live web execution.",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test lib/test/**/*.test.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "cordis-plugin",
+    "deepseek-harness",
+    "tic-80",
+    "fantasy-console",
+    "gamedev",
+    "pixel-art",
+    "chiptune"
+  ],
+  "author": "NoodleStormno",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NoodleStormno/dsh-plugin-tic80.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NoodleStormno/dsh-plugin-tic80/issues"
+  },
+  "homepage": "https://github.com/NoodleStormno/dsh-plugin-tic80#readme",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./core": {
+      "types": "./lib/core/index.d.ts",
+      "import": "./lib/core/index.js"
+    },
+    "./runner": {
+      "types": "./lib/runner/index.d.ts",
+      "import": "./lib/runner/index.js"
+    },
+    "./templates": {
+      "types": "./lib/templates/index.d.ts",
+      "import": "./lib/templates/index.js"
+    },
+    "./tools": {
+      "types": "./lib/tools/index.d.ts",
+      "import": "./lib/tools/index.js"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-tools": "^0.1.5-rc.1",
+    "@deepseek-ai/schemastery": "^3.18.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.7.2"
+  }
+}

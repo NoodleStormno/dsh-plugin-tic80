@@ -1,0 +1,6 @@
+- id: tic80
+  name: 'dsh-plugin-tic80'
+  config:
+    defaultTemplate: minimal
+    autoRun: false
+    webStudioPort: 3088

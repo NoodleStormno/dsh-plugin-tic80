@@ -1,0 +1,14 @@
+node_modules/
+lib/
+*.tgz
+*.log
+.DS_Store
+dist/
+temp/
+tic80.exe
+*.exe
+*.tic
+test_cart*
+temp_*
+export/
+.local/
