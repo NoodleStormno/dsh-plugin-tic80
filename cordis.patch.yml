@@ -1,6 +1,9 @@
-- id: tic80
-  name: 'dsh-plugin-tic80'
-  config:
-    defaultTemplate: minimal
-    autoRun: false
-    webStudioPort: 3088
+# DeepSeek Harness (dsh) cordis configuration patch for dsh-plugin-tic80
+# Usage: npx @deepseek-ai/dsh web --patch "E:/dsh-plugin-tic80/cordis.patch.yml"
+- insert:
+    - id: tic80
+      name: dsh-plugin-tic80
+      config:
+        defaultTemplate: minimal
+        autoRun: true
+        webStudioPort: 3088
