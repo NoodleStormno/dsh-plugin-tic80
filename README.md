@@ -15,6 +15,12 @@ It preserves 100% of TIC-80's official console capabilities while enabling conve
   <img src="./assets/preview.png" alt="DeepSeek Harness with Embedded TIC-80 Studio" width="100%" />
 </p>
 
+### ⚡ Built for Rapid Prototyping
+
+- 🎯 **Instant Game Prototyping**: Designed specifically for fast gameplay iteration and mechanic testing. Go from a natural language prompt to a playable, fully-featured retro game in seconds.
+- ⚙️ **Config-Driven Game Feel Tuning**: Adheres to strict coding conventions where all tunable gameplay variables (such as jump impulse `jump`, `gravity`, movement `speed`, `friction`) are grouped into a configuration table (`cfg = { ... }`) right at the **very top of the code**. Effortlessly tweak platforming feel and physics without digging through complex game loops!
+- 🗺️ **WYSIWYG Level Design with Map Editor**: Avoid hardcoding massive 2D level tables in Lua. Design and edit levels directly with TIC-80's built-in **Map Editor (`F3`)**. Powered by Sprite Flags for solid collision and dynamic entity parsing, level construction is completely "What You See Is What You Get".
+
 ---
 
 ## 🌟 Key Features
