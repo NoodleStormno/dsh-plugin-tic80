@@ -24,8 +24,10 @@ It preserves 100% of TIC-80's official console capabilities while enabling conve
 - 💬 **Conversational Game Development**:
   - Exposes 13 typed model tools (`dsh-tools`), allowing LLMs to design level maps, write Lua scripts, generate ASCII pixel art, synthesize retro sound effects, and arrange music through natural language.
   - Built-in static Linter checking Lua syntax, `TIC()` entrypoint, 512KB memory budget, and sandbox safety.
-- 🚀 **Dual Runner & Live Hot-Reload**:
-  - **Web Live Studio**: Embedded HTML5/WebAssembly pixel canvas and WebSocket server. Edits made by the LLM or user update the browser canvas immediately without page reloads.
+- 🚀 **Embedded Web UI & Real-Time Hot-Reload**:
+  - **DSH Embedded 3-Column Studio**: TIC-80 virtual game console is embedded directly into the DeepSeek Harness Web UI (Left: DSH sidebar, **Middle: TIC-80 Console Screen**, Right: AI Chat), providing an all-in-one game dev environment.
+  - **Turn-1 Ready Blank Cartridge**: Pre-seeded with `cartridge/game.lua` and fully injected into the System Prompt. The LLM starts generating game logic and assets in Turn 1 without wasting turns re-creating cartridges.
+  - **Live Web Studio**: Integrated Fengari Lua 5.3 engine and WebSocket synchronization. Tool edits made by the LLM update the middle-column game screen immediately.
   - **Native Desktop Runner**: Headless CLI execution and desktop window integration with official `tic80.exe`.
 - 📦 **Multi-format Exporters**:
   - One-click export to `.lua` source carts, `.tic` binary ROMs, and standalone playable `.html` web games.

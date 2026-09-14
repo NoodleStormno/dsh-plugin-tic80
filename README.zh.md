@@ -22,8 +22,10 @@
 - 💬 **对话式 AI 游戏开发**：
   - 为 DeepSeek Harness 提供 13 个类型化模型工具（`dsh-tools`），LLM 可通过对话设计游戏关卡、编写 Lua 逻辑、生成 ASCII 像素画、合成 8-bit 音效并编排复古 BGM。
   - 内置智能 Linter 静态分析引擎，实时检测 Lua 语法、`TIC()` 主循环合规性、512KB 内存限制与越界调用。
-- 🚀 **双运行环境与实时热重载**：
-  - **Web Live Studio**：内置 HTML5/WebAssembly 像素画布与 WebSocket 实时同步服务器。LLM 或用户修改任意代码、精灵、地图或音乐，浏览器画面即时热更新，无需刷新页面。
+- 🚀 **内置嵌入式 UI 与实时热重载**：
+  - **DSH 内嵌三栏工作台**：TIC-80 虚拟游戏机直接潜入 DeepSeek Harness Web 页面（左侧为 DSH 侧边栏，**中间栏为 TIC-80 游戏机屏幕**，右侧为 AI 对话栏），无需在多个窗口来回切换。
+  - **开箱即用空白卡带**：预置 `cartridge/game.lua` 现成可运行模板并已完整注入 System Prompt，LLM 零等待、第 1 轮对话即可直接编写游戏代码与素材，无需花费轮次重新建工程。
+  - **Web Live Studio**：内置 Fengari Lua 5.3 引擎与 WebSocket 实时热更新，LLM 或用户修改任意代码、精灵、地图或音效，中间屏幕即时响应。
   - **Native Desktop Runner**：无缝对接本地 `tic80.exe` 桌面版，支持 Headless CLI 测试与全屏运行。
 - 📦 **多格式导出**：
   - 一键导出 `.lua` 源码卡带、`.tic` 二进制 ROM、单文件独立运行的 `.html` 网页游戏。
