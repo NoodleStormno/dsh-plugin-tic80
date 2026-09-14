@@ -110,10 +110,15 @@ export class WebStudioServer {
           res.end(this.currentCart?.toText() || '');
         } else if (rawPath === '/tic80/cart.tic') {
           const bin = this.currentCart?.toBinary() || new Uint8Array();
-          res.writeHead(200, {
+          const isDownload = req.url && req.url.includes('download=1');
+          const headers: Record<string, string> = {
             'Content-Type': 'application/octet-stream',
-            'Content-Disposition': 'attachment; filename="game.tic"'
-          });
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          };
+          if (isDownload) {
+            headers['Content-Disposition'] = 'attachment; filename="game.tic"';
+          }
+          res.writeHead(200, headers);
           res.end(Buffer.from(bin));
         } else if (rawPath === '/tic80/api/status') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -222,9 +227,17 @@ export class WebStudioServer {
         } else if (url === '/cart.lua') {
           res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
           res.end(this.currentCart?.toText() || '');
-        } else if (url === '/cart.tic') {
+        } else if (url === '/cart.tic' || url.startsWith('/cart.tic?') || url === '/tic80/cart.tic' || url.startsWith('/tic80/cart.tic?')) {
           const bin = this.currentCart?.toBinary() || new Uint8Array();
-          res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+          const isDownload = url.includes('download=1');
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/octet-stream',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          };
+          if (isDownload) {
+            headers['Content-Disposition'] = 'attachment; filename="game.tic"';
+          }
+          res.writeHead(200, headers);
           res.end(Buffer.from(bin));
         } else if (url === '/api/status') {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -482,132 +495,141 @@ export class WebStudioServer {
 
 <script id="dsh-tic80-embedded-script">
   (function() {
+    let cachedPane = null;
+    let cachedSplitter = null;
+
     function mountTic80Studio() {
       const centerCol = document.querySelector('.pI_x6G_centerCol');
       if (!centerCol) return false;
 
-      if (document.getElementById('tic80-pane')) {
+      if (cachedPane && centerCol.contains(cachedPane)) {
         return true;
       }
 
-      // 1. Create TIC-80 Studio Pane
-      const pane = document.createElement('div');
-      pane.id = 'tic80-pane';
-      pane.innerHTML = \`
-        <div id="tic80-header">
-          <div class="tic80-header-left">
-            <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80 官方完整版</span>
-            <span style="color:#94a3b8; font-size:12px; font-family:monospace;">game.lua</span>
+      if (!cachedPane) {
+        // 1. Create TIC-80 Studio Pane once
+        cachedPane = document.createElement('div');
+        cachedPane.id = 'tic80-pane';
+        cachedPane.innerHTML = \`
+          <div id="tic80-header">
+            <div class="tic80-header-left">
+              <span class="tic80-badge"><span class="tic80-dot"></span>TIC-80 官方完整版</span>
+              <span style="color:#94a3b8; font-size:12px; font-family:monospace;">game.lua</span>
+            </div>
+            <div class="tic80-header-right">
+              <button class="tic80-btn" id="btn-tic-esc" title="切换到控制台终端命令行 (Esc)">🖥️ 终端 (Esc)</button>
+              <button class="tic80-btn" id="btn-tic-f1" title="切换到代码编辑器 (F1)">📝 代码 (F1)</button>
+              <button class="tic80-btn" id="btn-tic-f2" title="切换到精灵/图块编辑器 (F2)">🎨 精灵 (F2)</button>
+              <button class="tic80-btn" id="btn-tic-f3" title="切换到地图编辑器 (F3)">🗺️ 地图 (F3)</button>
+              <button class="tic80-btn" id="btn-tic-f4" title="切换到音效编辑器 (F4)">🔊 音效 (F4)</button>
+              <button class="tic80-btn" id="btn-tic-f5" title="切换到音乐Tracker (F5)">🎵 音乐 (F5)</button>
+              <button class="tic80-btn tic80-btn-primary" id="btn-tic-run" title="运行/恢复游戏 (Ctrl+R / F11)">▶️ 运行 (Ctrl+R)</button>
+              <button class="tic80-btn" id="btn-tic-restart" title="重启并重新加载卡带">🔄 重置</button>
+              <button class="tic80-btn" id="btn-tic-export" title="导出 .TIC 独立文件">💾 导出 .TIC</button>
+              <button class="tic80-btn" id="btn-tic-popout" title="新标签页打开">🗔 弹窗</button>
+            </div>
           </div>
-          <div class="tic80-header-right">
-            <button class="tic80-btn" id="btn-tic-esc" title="切换到控制台终端命令行 (Esc)">🖥️ 终端 (Esc)</button>
-            <button class="tic80-btn" id="btn-tic-f1" title="切换到代码编辑器 (F1)">📝 代码 (F1)</button>
-            <button class="tic80-btn" id="btn-tic-f2" title="切换到精灵/图块编辑器 (F2)">🎨 精灵 (F2)</button>
-            <button class="tic80-btn" id="btn-tic-f3" title="切换到地图编辑器 (F3)">🗺️ 地图 (F3)</button>
-            <button class="tic80-btn" id="btn-tic-f4" title="切换到音效编辑器 (F4)">🔊 音效 (F4)</button>
-            <button class="tic80-btn" id="btn-tic-f5" title="切换到音乐Tracker (F5)">🎵 音乐 (F5)</button>
-            <button class="tic80-btn tic80-btn-primary" id="btn-tic-run" title="运行/恢复游戏 (Ctrl+R / F11)">▶️ 运行 (Ctrl+R)</button>
-            <button class="tic80-btn" id="btn-tic-restart" title="重启并重新加载卡带">🔄 重置</button>
-            <button class="tic80-btn" id="btn-tic-export" title="导出 .TIC 独立文件">💾 导出 .TIC</button>
-            <button class="tic80-btn" id="btn-tic-popout" title="新标签页打开">🗔 弹窗</button>
+          <div id="tic80-viewport">
+            <iframe id="tic80-iframe" src="/tic80/" allow="autoplay"></iframe>
           </div>
-        </div>
-        <div id="tic80-viewport">
-          <iframe id="tic80-iframe" src="/tic80/" allow="autoplay"></iframe>
-        </div>
-        <div id="tic80-footer">
-          <span>🎮 官方 TIC-80 虚拟电脑 | CLI 命令行 | F1代码 F2精灵 F3地图 F4音效 F5音乐</span>
-          <span>⚡ Esc 终端 | Ctrl+R / F11 运行 | 方向键 / WASD 移动 | Z / X 交互</span>
-        </div>
-      \`;
+          <div id="tic80-footer">
+            <span>🎮 官方 TIC-80 虚拟电脑 | CLI 命令行 | F1代码 F2精灵 F3地图 F4音效 F5音乐</span>
+            <span>⚡ Esc 终端 | Ctrl+R 运行 | 方向键 / WASD 移动 | Z / X 交互</span>
+          </div>
+        \`;
 
-      // 2. Create Splitter Bar
-      const splitter = document.createElement('div');
-      splitter.id = 'tic80-splitter';
+        // 2. Create Splitter Bar once
+        cachedSplitter = document.createElement('div');
+        cachedSplitter.id = 'tic80-splitter';
 
-      // 3. Insert into centerCol
-      centerCol.insertBefore(splitter, centerCol.firstChild);
-      centerCol.insertBefore(pane, splitter);
-
-      // 4. Wire control buttons
-      const sendKeyMsg = (key, code, keyCode, ctrl = false) => {
-        const iframe = document.getElementById('tic80-iframe');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({ type: 'SEND_KEY', key, code, keyCode, ctrl }, '*');
-        }
-      };
-
-      pane.querySelector('#btn-tic-esc').onclick = () => sendKeyMsg('Escape', 'Escape', 27);
-      pane.querySelector('#btn-tic-f1').onclick = () => sendKeyMsg('F1', 'F1', 112);
-      pane.querySelector('#btn-tic-f2').onclick = () => sendKeyMsg('F2', 'F2', 113);
-      pane.querySelector('#btn-tic-f3').onclick = () => sendKeyMsg('F3', 'F3', 114);
-      pane.querySelector('#btn-tic-f4').onclick = () => sendKeyMsg('F4', 'F4', 115);
-      pane.querySelector('#btn-tic-f5').onclick = () => sendKeyMsg('F5', 'F5', 116);
-      pane.querySelector('#btn-tic-run').onclick = () => sendKeyMsg('r', 'KeyR', 82, true);
-
-      pane.querySelector('#btn-tic-restart').onclick = () => {
-        const iframe = document.getElementById('tic80-iframe');
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({ type: 'RELOAD_CART' }, '*');
-        }
-      };
-
-      pane.querySelector('#btn-tic-export').onclick = () => {
-        window.open('/tic80/cart.tic', '_blank');
-      };
-
-      pane.querySelector('#btn-tic-popout').onclick = () => {
-        window.open('/tic80/', '_blank');
-      };
-
-      // 5. Drag Resizer
-      let isDragging = false;
-      splitter.onmousedown = (e) => {
-        isDragging = true;
-        splitter.classList.add('dragging');
-        document.body.style.cursor = 'col-resize';
-        const iframe = document.getElementById('tic80-iframe');
-        if (iframe) iframe.style.pointerEvents = 'none';
-        e.preventDefault();
-      };
-
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const chatCol = centerCol.querySelector('*:not(#tic80-pane):not(#tic80-splitter)');
-        if (chatCol) {
-          const centerRect = centerCol.getBoundingClientRect();
-          const newChatWidth = Math.max(340, Math.min(850, centerRect.right - e.clientX));
-          chatCol.style.width = newChatWidth + 'px';
-          chatCol.style.flex = '0 0 ' + newChatWidth + 'px';
-        }
-      });
-
-      window.addEventListener('mouseup', () => {
-        if (isDragging) {
-          isDragging = false;
-          splitter.classList.remove('dragging');
-          document.body.style.cursor = '';
+        // 3. Wire control buttons
+        const sendKeyMsg = (key, code, keyCode, ctrl = false) => {
           const iframe = document.getElementById('tic80-iframe');
-          if (iframe) iframe.style.pointerEvents = 'auto';
-        }
-      });
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'SEND_KEY', key, code, keyCode, ctrl }, '*');
+          }
+        };
 
+        cachedPane.querySelector('#btn-tic-esc').onclick = () => sendKeyMsg('Escape', 'Escape', 27);
+        cachedPane.querySelector('#btn-tic-f1').onclick = () => sendKeyMsg('F1', 'F1', 112);
+        cachedPane.querySelector('#btn-tic-f2').onclick = () => sendKeyMsg('F2', 'F2', 113);
+        cachedPane.querySelector('#btn-tic-f3').onclick = () => sendKeyMsg('F3', 'F3', 114);
+        cachedPane.querySelector('#btn-tic-f4').onclick = () => sendKeyMsg('F4', 'F4', 115);
+        cachedPane.querySelector('#btn-tic-f5').onclick = () => sendKeyMsg('F5', 'F5', 116);
+        cachedPane.querySelector('#btn-tic-run').onclick = () => sendKeyMsg('r', 'KeyR', 82, true);
+
+        cachedPane.querySelector('#btn-tic-restart').onclick = () => {
+          const iframe = document.getElementById('tic80-iframe');
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({ type: 'RELOAD_CART' }, '*');
+          }
+        };
+
+        cachedPane.querySelector('#btn-tic-export').onclick = () => {
+          window.open('/tic80/cart.tic?download=1', '_blank');
+        };
+
+        cachedPane.querySelector('#btn-tic-popout').onclick = () => {
+          window.open('/tic80/', '_blank');
+        };
+
+        // 4. Drag Resizer
+        let isDragging = false;
+        cachedSplitter.onmousedown = (e) => {
+          isDragging = true;
+          cachedSplitter.classList.add('dragging');
+          document.body.style.cursor = 'col-resize';
+          const iframe = document.getElementById('tic80-iframe');
+          if (iframe) iframe.style.pointerEvents = 'none';
+          e.preventDefault();
+        };
+
+        window.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          const chatCol = centerCol.querySelector('*:not(#tic80-pane):not(#tic80-splitter)');
+          if (chatCol) {
+            const centerRect = centerCol.getBoundingClientRect();
+            const newChatWidth = Math.max(340, Math.min(850, centerRect.right - e.clientX));
+            chatCol.style.width = newChatWidth + 'px';
+            chatCol.style.flex = '0 0 ' + newChatWidth + 'px';
+          }
+        });
+
+        window.addEventListener('mouseup', () => {
+          if (isDragging) {
+            isDragging = false;
+            cachedSplitter.classList.remove('dragging');
+            document.body.style.cursor = '';
+            const iframe = document.getElementById('tic80-iframe');
+            if (iframe) iframe.style.pointerEvents = 'auto';
+          }
+        });
+      }
+
+      // Insert cached elements into centerCol
+      centerCol.insertBefore(cachedSplitter, centerCol.firstChild);
+      centerCol.insertBefore(cachedPane, cachedSplitter);
       return true;
     }
 
-    // Repeated check to survive SPA navigation and React DOM unmounts
     function ensureMounted() {
       const centerCol = document.querySelector('.pI_x6G_centerCol');
-      if (centerCol && !document.getElementById('tic80-pane')) {
+      if (centerCol && (!cachedPane || !centerCol.contains(cachedPane))) {
         mountTic80Studio();
       }
     }
 
     ensureMounted();
-    setInterval(ensureMounted, 300);
+    setInterval(ensureMounted, 1000);
 
+    let debounceTimer = null;
     const observer = new MutationObserver(() => {
-      ensureMounted();
+      if (!debounceTimer) {
+        debounceTimer = setTimeout(() => {
+          debounceTimer = null;
+          ensureMounted();
+        }, 300);
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true });
   })();
@@ -628,6 +650,10 @@ export class WebStudioServer {
   generatePlayerHtml(cart: Cartridge, liveSync: boolean = false): string {
     const cartTextJson = JSON.stringify(cart.toText());
     const title = cart.metadata.title || 'TIC-80 官方完整版';
+    const cartUrl = liveSync ? '/tic80/cart.tic' : '/cart.tic';
+    const wasmUrl = liveSync ? '/tic80/vendor/tic80.wasm' : '/vendor/tic80.wasm';
+    const jsUrl = liveSync ? '/tic80/vendor/tic80.js' : '/vendor/tic80.js';
+    const wsPath = liveSync ? '/tic80-ws' : '/';
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -703,6 +729,7 @@ export class WebStudioServer {
       font-family: monospace;
       font-size: 13px;
       transition: opacity 0.25s ease;
+      cursor: pointer;
     }
 
     .spinner {
@@ -760,6 +787,21 @@ export class WebStudioServer {
       setTimeout(() => { toast.style.display = 'none'; }, 2000);
     }
 
+    function hideLoading() {
+      if (loadingCover && loadingCover.style.display !== 'none') {
+        loadingCover.style.opacity = '0';
+        setTimeout(() => {
+          loadingCover.style.display = 'none';
+        }, 200);
+      }
+    }
+
+    // Safety timeout to ensure loading cover is never stuck
+    setTimeout(hideLoading, 1500);
+    if (loadingCover) loadingCover.addEventListener('click', hideLoading);
+    document.addEventListener('keydown', hideLoading, { once: true });
+    canvas.addEventListener('click', () => { canvas.focus(); hideLoading(); });
+
     // Dispatch keyboard event to canvas and window for SDL
     window.sendKey = function(key, code, keyCode, ctrl = false) {
       canvas.focus();
@@ -787,7 +829,7 @@ export class WebStudioServer {
         });
         canvas.dispatchEvent(up);
         window.dispatchEvent(up);
-      }, 50);
+      }, 60);
     };
 
     window.addEventListener('message', (e) => {
@@ -802,29 +844,39 @@ export class WebStudioServer {
     // Emscripten Module configuration for official TIC-80
     var Module = {
       canvas: canvas,
-      arguments: ['/game.lua', '--cmd=run'],
+      arguments: ['${cartUrl}'],
       locateFile: function(path, prefix) {
-        if (path.endsWith('.wasm')) return '/tic80/vendor/tic80.wasm';
+        if (path.endsWith('.wasm')) return '${wasmUrl}';
         return prefix + path;
+      },
+      print: function(text) {
+        console.log('[TIC-80]', text);
+      },
+      printErr: function(text) {
+        console.warn('[TIC-80 ERR]', text);
+      },
+      setStatus: function(text) {
+        if (text) console.log('[TIC-80 Status]', text);
+        if (!text || text === 'Running...') {
+          hideLoading();
+        }
       },
       preRun: [
         function(mod) {
+          mod = mod || Module;
           mod.ENV = mod.ENV || {};
           mod.ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = '#canvas';
-
-          try {
-            mod.FS.writeFile('/game.lua', initialCartText);
-          } catch(err) {
-            console.error('Error writing /game.lua into MEMFS:', err);
-          }
         }
       ],
+      onRuntimeInitialized: function() {
+        console.log('[TIC-80 WASM] Runtime initialized');
+        hideLoading();
+        canvas.focus();
+      },
       postRun: [
         function() {
-          if (loadingCover) {
-            loadingCover.style.opacity = '0';
-            setTimeout(() => { loadingCover.style.display = 'none'; }, 250);
-          }
+          console.log('[TIC-80 WASM] PostRun callback executed');
+          hideLoading();
           canvas.focus();
         }
       ]
@@ -832,40 +884,69 @@ export class WebStudioServer {
 
     // WebSocket for Live Hot Reload from DSH tools
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = wsProtocol + '//' + window.location.host + '/tic80-ws';
+    const wsUrl = wsProtocol + '//' + window.location.host + '${wsPath}';
     let ws = null;
+    let loadedCartHash = null;
+
+    function hashString(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+      }
+      return hash;
+    }
+
+    loadedCartHash = hashString(initialCartText);
 
     function connectWs() {
-      ws = new WebSocket(wsUrl);
-      ws.onopen = () => console.log('[TIC-80 WASM] Connected to Live Hot-Reload');
-      ws.onmessage = (evt) => {
-        try {
-          const data = JSON.parse(evt.data);
-          if (data.type === 'HOT_RELOAD' || data.type === 'INIT_CART') {
-            console.log('[TIC-80 WASM] Hot-reload received:', data.updateType || 'ALL');
-            showToast('⚡ 卡带热更新已生效 (' + (data.updateType || 'ALL') + ')');
-
-            if (Module && Module.FS && data.cartText) {
-              try {
-                Module.FS.writeFile('/game.lua', data.cartText);
-              } catch(e) {}
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onopen = () => console.log('[TIC-80 WASM] Connected to Live Hot-Reload');
+        ws.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            if (data.type === 'INIT_CART') {
+              // Initial connection handshake - NEVER reload on INIT_CART!
+              console.log('[TIC-80 WASM] Initial cart registered via WS');
+              if (data.cartText) {
+                loadedCartHash = hashString(data.cartText);
+              }
+              return;
             }
 
-            setTimeout(() => {
-              window.location.reload();
-            }, 300);
+            if (data.type === 'HOT_RELOAD') {
+              // Only reload if the cart content has actually changed!
+              if (data.cartText) {
+                const newHash = hashString(data.cartText);
+                if (newHash === loadedCartHash) {
+                  console.log('[TIC-80 WASM] Hot-reload skipped: cart content identical');
+                  return;
+                }
+                loadedCartHash = newHash;
+              }
+
+              console.log('[TIC-80 WASM] Hot-reload received:', data.updateType || 'ALL');
+              showToast('⚡ 卡带热更新已生效 (' + (data.updateType || 'ALL') + ')');
+
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            }
+          } catch(e) {
+            console.error(e);
           }
-        } catch(e) {
-          console.error(e);
-        }
-      };
-      ws.onclose = () => {
-        setTimeout(connectWs, 2000);
-      };
+        };
+        ws.onclose = () => {
+          setTimeout(connectWs, 3000);
+        };
+      } catch(e) {
+        setTimeout(connectWs, 3000);
+      }
     }
     connectWs();
   </script>
-  <script src="/tic80/vendor/tic80.js"></script>
+  <script src="${jsUrl}"></script>
 </body>
 </html>`;
   }

@@ -1,4 +1,4 @@
-﻿import { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import * as assert from 'node:assert';
 import * as http from 'node:http';
 import { Cartridge } from '../core/cartridge.js';
@@ -21,8 +21,7 @@ describe('TIC-80 Web Runner & WASM Server', () => {
     assert.ok(html.includes('id="canvas"'), 'Should contain canvas element');
     assert.ok(html.includes('tic80.wasm'), 'Should reference tic80.wasm');
     assert.ok(html.includes('tic80.js'), 'Should reference tic80.js');
-    assert.ok(html.includes('Module'), 'Should configure Emscripten Module');
-    assert.ok(html.includes('/game.lua'), 'Should mount /game.lua');
+    assert.ok(html.includes('cart.tic'), 'Should configure cartridge cart.tic');
   });
 
   it('injects official TIC-80 studio buttons into DSH index.html', () => {
