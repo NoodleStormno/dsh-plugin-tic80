@@ -12,6 +12,17 @@ export interface StudioPromptOptions {
     cartCode: string;
 }
 /**
+ * Sanitizes prompt text to prevent collision with DSH's strict template variable parser.
+ * In DeepSeek Harness (@deepseek-ai/dsh-system-prompt), any occurrences of `{{...}}`
+ * are parsed as template variable references. In Lua, table-of-tables or nested tables
+ * such as `dirs = {{0, -1}, {0, 1}}` or `{{{...}}}` trigger fatal:
+ * "malformed prompt variable reference (references are complete simple {{name}} groups)".
+ *
+ * By inserting a single space between adjacent curly braces (`{ {` and `} }`),
+ * we eliminate the literal `{{` trigger while producing 100% syntactically valid Lua.
+ */
+export declare function sanitizeForDshPrompt(text: string): string;
+/**
  * Builds the complete system prompt for the DSH Embedded TIC-80 Studio.
  * Integrates DSH 3-column layout, zero turn-wasting directives,
  * no-os library safety rules, the 10-section OpenTIC prompt, and the active live cartridge code.

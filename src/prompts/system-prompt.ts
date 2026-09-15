@@ -15,26 +15,43 @@ export interface StudioPromptOptions {
 }
 
 /**
+ * Sanitizes prompt text to prevent collision with DSH's strict template variable parser.
+ * In DeepSeek Harness (@deepseek-ai/dsh-system-prompt), any occurrences of `{{...}}`
+ * are parsed as template variable references. In Lua, table-of-tables or nested tables
+ * such as `dirs = {{0, -1}, {0, 1}}` or `{{{...}}}` trigger fatal:
+ * "malformed prompt variable reference (references are complete simple {{name}} groups)".
+ * 
+ * By inserting a single space between adjacent curly braces (`{ {` and `} }`),
+ * we eliminate the literal `{{` trigger while producing 100% syntactically valid Lua.
+ */
+export function sanitizeForDshPrompt(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\{(?=\{)/g, '{ ')
+    .replace(/\}(?=\})/g, '} ');
+}
+
+/**
  * Builds the complete system prompt for the DSH Embedded TIC-80 Studio.
  * Integrates DSH 3-column layout, zero turn-wasting directives,
  * no-os library safety rules, the 10-section OpenTIC prompt, and the active live cartridge code.
  */
 export function buildStudioSystemPrompt(options: StudioPromptOptions): string {
   const { cartPath, cartCode } = options;
-  return [
-    '## ?? TIC-80 Embedded Workspace & Real-Time Studio',
+  const rawPrompt = [
+    '## 🎮 TIC-80 Embedded Workspace & Real-Time Studio',
     '- The TIC-80 virtual fantasy console is EMBEDDED DIRECTLY IN THE MIDDLE COLUMN of the user interface (240x136 @ 60 FPS, Sweetie-16 palette, live audio/video).',
     '- The active cartridge is ALREADY RUNNING at `' + cartPath + '`.',
     '- Layout: Left column = DSH Navigation/Sidebar, Middle column = TIC-80 Live Console & Studio, Right column = AI Chat Conversation.',
     '- Real-Time Sync: Any edits made to `' + cartPath + '` or via tools automatically hot-reload into the middle-column game screen via WebSocket.',
     '',
-    '## ? ZERO TURN-WASTING DIRECTIVE (DO NOT RE-INITIALIZE)',
+    '## ⚡ ZERO TURN-WASTING DIRECTIVE (DO NOT RE-INITIALIZE)',
     '- A standard, fully-playable blank cartridge is ALREADY LOADED and running right now in the middle screen!',
     '- Target File: `' + cartPath + '`',
     '- CRITICAL: DO NOT call `tic80_init` or `tic80_get_cart` to explore, check, or create a project! Everything is already initialized and live.',
     '- In Turn 1, IMMEDIATELY modify the file or invoke tools to create what the user requested.',
     '',
-    '## ?? CRITICAL LUA SANDBOX RULE (NO OS LIBRARY - DO NOT CAUSE NIL ERRORS)',
+    '## ⚠️ CRITICAL LUA SANDBOX RULE (NO OS LIBRARY - DO NOT CAUSE NIL ERRORS)',
     '- The standard Lua `os` library does NOT exist in TIC-80 (`os` is nil)!',
     '- DO NOT call `os.time()`, `os.clock()`, `os.date()`, `os.exit()` or index `os.*` anywhere in your code.',
     '- Calling `os.*` will immediately crash the game with: `attempt to index a nil value (global \'os\')`.',
@@ -52,4 +69,6 @@ export function buildStudioSystemPrompt(options: StudioPromptOptions): string {
     '',
     'Directive: Strictly modify the target file or call tools. Output only a brief 1-line confirmation when done.',
   ].join('\n');
+
+  return sanitizeForDshPrompt(rawPrompt);
 }

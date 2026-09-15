@@ -114,5 +114,34 @@ describe('Cordis Plugin Lifecycle', () => {
     assert.strictEqual(cartDefault, path.resolve(ws, 'cartridge/game.lua'));
     assert.ok(!cartDefault.includes('dsh-plugin-tic80'), 'Cartridge path must NOT point to plugin source directory');
   });
+
+  test('sanitizeForDshPrompt escapes {{ and }} to prevent malformed prompt variable reference crashes', () => {
+    const codeWithNestedTables = `
+local dirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
+local matrix = {{{1, 2}}, {{3, 4}}}
+`;
+    const prompt = Tic80Plugin.buildStudioSystemPrompt({
+      cartPath: 'C:\\test\\game.lua',
+      cartCode: codeWithNestedTables,
+    });
+
+    // Must not contain any literal {{ or }}
+    assert.strictEqual(prompt.includes('{{'), false, 'Prompt must not contain literal {{');
+    assert.strictEqual(prompt.includes('}}'), false, 'Prompt must not contain literal }}');
+
+    // Verify against DSH's exact system prompt interpolate() validator
+    const GROUP_AT = /^\{\{([^{}]*)\}\}/;
+    let text = prompt;
+    let last = 0;
+    for (let open = text.indexOf('{{'); open >= 0; open = text.indexOf('{{', last)) {
+      const group = GROUP_AT.exec(text.slice(open));
+      if (group === null) {
+        if (text.indexOf('}}', open + 2) >= 0) {
+          assert.fail(`DSH system-prompt engine would throw on: ${text.slice(open, open + 20)}`);
+        }
+      }
+      last = open + 2;
+    }
+  });
 });
 
