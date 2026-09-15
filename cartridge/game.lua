@@ -1,305 +1,393 @@
--- title:  TIC-80 Game
--- author: DeepSeek & User
--- desc:   Created with DeepSeek Harness
+-- title:  Sokoban Multiverse
+-- author: TIC-80 Assistant
+-- desc:   Multi-room Sokoban puzzle with window-sized stages (30x17) auto-detected in L-to-R, T-to-B order
 -- script: lua
 -- input:  gamepad
 
--- title:   Sokoban
--- author:  DeepSeek & User
--- desc:    Sokoban with auto-detected levels and auto-advance
--- script:  lua
--- input:   gamepad
-
 --------------------------------------------------------------------
--- CONFIG - all gameplay tuning values live here (tweak freely)
+-- CONFIG: Tunable gameplay parameters at the very top
 --------------------------------------------------------------------
--- HOW LEVELS WORK (no code change needed to add one):
---   1. Stamp the MARKER tile (id 7) anywhere on the map -> that cell is
---      the level's anchor; the playable room is the window that starts
---      right below it: (x, y+1) .. (x+w-1, y+h).
---   2. Draw the room inside that window: wall / floor / goal tiles and
---      exactly one player tile + one or more crate tiles.
---   3. Levels are AUTO-DETECTED by scanning the map for markers, in
---      top-to-bottom, left-to-right order. Clearing one loads the next.
-local cfg = {
-  map_w = 10, map_h = 8,      -- level window size in tiles
-  scr_x = 80, scr_y = 32,     -- where the window is drawn (pixels)
+cfg = {
+  room_w = 30,              -- Width of one room in tiles (240px / 8)
+  room_h = 17,              -- Height of one room in tiles (136px / 8)
+  rooms_x = 8,              -- Max rooms horizontally on 240-wide map
+  rooms_y = 8,              -- Max rooms vertically on 136-high map
 
-  -- Tile IDs (Bank 0 - drawn in the TIC-80 tile editor)
-  t_wall   = 1,   -- solid block (sprite flag 0)
-  t_floor  = 2,
-  t_goal   = 3,
-  t_box    = 4,   -- crate: placed on the map, becomes an entity at load
-  t_player = 5,   -- player: placed on the map, becomes an entity at load
-  t_boxok  = 6,   -- crate resting on a goal (drawn instead of t_box)
-  t_marker = 7,   -- level anchor (never drawn)
+  -- Tile IDs (Bank 0 - Map layer)
+  t_wall = 1,               -- Solid wall
+  t_floor = 2,              -- Interior floor
+  t_goal = 3,               -- Target / Goal plate
+  t_box = 4,                -- Box entity spawn
+  t_player = 5,             -- Player entity spawn
+  t_box_on_goal = 6,        -- Box starting on target
 
-  -- Gameplay feel
-  solid_flag   = 0,     -- sprite flag index meaning "solid"
-  repeat_delay = 14,    -- frames held before auto-repeat
-  repeat_rate  = 6,     -- frames between auto-repeats
-  slide        = 0.45,  -- visual smoothing (0 = snap, 1 = never arrives)
-  max_undo     = 64,
-  win_delay    = 90,    -- frames the CLEAR banner shows before auto-next
+  -- Sprite IDs (Bank 1 - Entity layer)
+  spr_player = 1,           -- Player sprite
+  spr_box = 2,              -- Normal box sprite
+  spr_box_done = 3,         -- Box on target sprite
 
-  -- Sound effects
-  sfx_push = 0, sfx_win = 1, sfx_block = 2,
+  -- Gameplay Feel & Controls
+  solid_flag = 0,           -- Sprite flag 0 is solid wall
+  slide_speed = 0.45,       -- Smooth movement visual interpolation
+  repeat_delay = 14,        -- Frames before auto-repeat movement
+  repeat_rate = 6,          -- Frames between repeated moves
+  max_undo = 64,            -- Max undo history
+  auto_next_delay = 60,     -- Frames to celebrate before auto-next
+
+  -- Sound Effects
+  sfx_step = 0,
+  sfx_push = 1,
+  sfx_win = 2,
+  sfx_block = 3,
 }
 
 --------------------------------------------------------------------
 -- STATE
 --------------------------------------------------------------------
-local player     = {gx = 0, gy = 0, vx = 0, vy = 0}  -- grid + visual pos
-local boxes      = {}                                -- {gx,gy,vx,vy}
-local history    = {}                                -- undo stack
-local erased     = {}                                -- map cells we cleared
-local levels     = {}                                -- auto-detected windows
-local level_no   = 1                                 -- current level (1-based)
-local moves      = 0
-local cleared    = false
-local clear_wait = 0                                 -- frames until auto-next
-local empty_skip = 0                                 -- guards broken levels
+local levels = {}           -- Auto-detected 30x17 room list
+local level_no = 1          -- Active level index (1-based)
+local player = {gx = 0, gy = 0, vx = 0, vy = 0}
+local boxes = {}            -- Active boxes {gx, gy, vx, vy}
+local history = {}          -- Undo stack
+local erased = {}           -- Spawn tiles converted to floors
+local steps = 0
+local pushes = 0
+local cleared = false
+local clear_timer = 0
+local hold_dir = -1
+local hold_time = 0
 
-local function cur()
-  return levels[level_no] or {x = 0, y = 0, w = cfg.map_w, h = cfg.map_h}
+--------------------------------------------------------------------
+-- AUTO-DETECTION: Scans map rooms from left-to-right, top-to-bottom
+--------------------------------------------------------------------
+local function scan_levels()
+  levels = {}
+  for ry = 0, cfg.rooms_y - 1 do
+    for rx = 0, cfg.rooms_x - 1 do
+      local ox = rx * cfg.room_w
+      local oy = ry * cfg.room_h
+      local has_player = false
+      local box_count = 0
+      local goal_count = 0
+
+      for y = 0, cfg.room_h - 1 do
+        for x = 0, cfg.room_w - 1 do
+          local t = mget(ox + x, oy + y)
+          if t == cfg.t_player then has_player = true end
+          if t == cfg.t_box or t == cfg.t_box_on_goal then box_count = box_count + 1 end
+          if t == cfg.t_goal or t == cfg.t_box_on_goal then goal_count = goal_count + 1 end
+        end
+      end
+
+      -- Valid room if it contains boxes and goals
+      if box_count > 0 and goal_count > 0 then
+        table.insert(levels, {
+          rx = rx, ry = ry,
+          ox = ox, oy = oy,
+          box_count = box_count,
+          has_player = has_player,
+          name = string.format("ROOM %d-%d", rx + 1, ry + 1)
+        })
+      end
+    end
+  end
 end
 
 --------------------------------------------------------------------
--- MAP HELPERS (the map is the single source of truth)
+-- LEVEL LOADING & RESTORATION
 --------------------------------------------------------------------
-local function walkable(x, y)
-  local lv = cur()
-  if x < 0 or y < 0 or x >= lv.w or y >= lv.h then return false end
-  local t = mget(lv.x + x, lv.y + y)
-  if t == cfg.t_wall or fget(t, cfg.solid_flag) then return false end
-  return true
+local function restore_map()
+  for i = 1, #erased do
+    local e = erased[i]
+    mset(e.mx, e.my, e.t)
+  end
+  erased = {}
 end
 
 local function box_at(x, y)
   for i = 1, #boxes do
     local b = boxes[i]
-    if b.gx == x and b.gy == y then return b end
+    if b.gx == x and b.gy == y then return b, i end
   end
+  return nil
 end
 
-local function on_goal(x, y)
-  local lv = cur()
-  return mget(lv.x + x, lv.y + y) == cfg.t_goal
+local function is_on_goal(b)
+  local rm = levels[level_no]
+  return mget(rm.ox + b.gx, rm.oy + b.gy) == cfg.t_goal
 end
 
---------------------------------------------------------------------
--- LEVEL AUTO-DETECTION: scan the whole map once for marker tiles
---------------------------------------------------------------------
-local function scan_levels()
-  levels = {}
-  for my = 0, 135 do
-    for mx = 0, 239 do
-      if mget(mx, my) == cfg.t_marker then
-        levels[#levels + 1] = {x = mx, y = my + 1, w = cfg.map_w, h = cfg.map_h}
-      end
-    end
-  end
-end
-
---------------------------------------------------------------------
--- LEVEL LOADING: entities come straight from the map, then are erased
---------------------------------------------------------------------
 local function load_level(idx)
-  local n = #levels
-  if n == 0 then return end
+  restore_map()
+  if #levels == 0 then return end
 
-  for i = 1, #erased do                       -- restore previous erasures
-    local e = erased[i]
-    mset(e.mx, e.my, e.t)
-  end
-  erased, boxes, history = {}, {}, {}
-  moves, cleared, clear_wait = 0, false, 0
+  level_no = (idx - 1) % #levels + 1
+  local rm = levels[level_no]
 
-  level_no = (idx - 1) % n + 1                -- wrap around forever
-  local lv = levels[level_no]
+  boxes = {}
+  player = nil
+  history = {}
+  steps = 0
+  pushes = 0
+  cleared = false
+  clear_timer = 0
 
-  for y = 0, lv.h - 1 do
-    for x = 0, lv.w - 1 do
-      local mx, my = lv.x + x, lv.y + y
+  for y = 0, cfg.room_h - 1 do
+    for x = 0, cfg.room_w - 1 do
+      local mx, my = rm.ox + x, rm.oy + y
       local t = mget(mx, my)
-      if t == cfg.t_box then
-        boxes[#boxes + 1] = {gx = x, gy = y, vx = x, vy = y}
-        erased[#erased + 1] = {mx = mx, my = my, t = t}
+      if t == cfg.t_player then
+        player = {gx = x, gy = y, vx = x, vy = y}
+        table.insert(erased, {mx = mx, my = my, t = t})
         mset(mx, my, cfg.t_floor)
-      elseif t == cfg.t_player then
-        player.gx, player.gy, player.vx, player.vy = x, y, x, y
-        erased[#erased + 1] = {mx = mx, my = my, t = t}
+      elseif t == cfg.t_box then
+        table.insert(boxes, {gx = x, gy = y, vx = x, vy = y})
+        table.insert(erased, {mx = mx, my = my, t = t})
         mset(mx, my, cfg.t_floor)
+      elseif t == cfg.t_box_on_goal then
+        table.insert(boxes, {gx = x, gy = y, vx = x, vy = y})
+        table.insert(erased, {mx = mx, my = my, t = t})
+        mset(mx, my, cfg.t_goal)
       end
     end
   end
-  if #boxes > 0 then empty_skip = 0 end
-end
 
---------------------------------------------------------------------
--- RULES
---------------------------------------------------------------------
-local function push_undo()
-  local snap = {px = player.gx, py = player.gy, bx = {}}
-  for i = 1, #boxes do snap.bx[i] = {boxes[i].gx, boxes[i].gy} end
-  history[#history + 1] = snap
-  if #history > cfg.max_undo then table.remove(history, 1) end
-end
-
-local function undo()
-  local s = history[#history]
-  if not s then return end
-  history[#history] = nil
-  player.gx, player.gy = s.px, s.py
-  for i = 1, #boxes do
-    if s.bx[i] then boxes[i].gx, boxes[i].gy = s.bx[i][1], s.bx[i][2] end
+  if not player then
+    for y = 1, cfg.room_h - 2 do
+      for x = 1, cfg.room_w - 2 do
+        local t = mget(rm.ox + x, rm.oy + y)
+        if t == cfg.t_floor and not box_at(x, y) then
+          player = {gx = x, gy = y, vx = x, vy = y}
+          break
+        end
+      end
+      if player then break end
+    end
+    if not player then player = {gx = 1, gy = 1, vx = 1, vy = 1} end
   end
-  if moves > 0 then moves = moves - 1 end
-  cleared, clear_wait = false, 0
 end
 
-local function is_win()
+--------------------------------------------------------------------
+-- MOVEMENT & COLLISION
+--------------------------------------------------------------------
+local function is_walkable(x, y)
+  local rm = levels[level_no]
+  if x < 0 or x >= cfg.room_w or y < 0 or y >= cfg.room_h then return false end
+  local t = mget(rm.ox + x, rm.oy + y)
+  if t == cfg.t_wall or fget(t, cfg.solid_flag) then return false end
+  return true
+end
+
+local function check_win()
   if #boxes == 0 then return false end
   for i = 1, #boxes do
-    if not on_goal(boxes[i].gx, boxes[i].gy) then return false end
+    if not is_on_goal(boxes[i]) then return false end
   end
   return true
 end
 
-local function try_move(dx, dy)
+local function move(dx, dy)
   if cleared then return end
   local nx, ny = player.gx + dx, player.gy + dy
-
-  if not walkable(nx, ny) then sfx(cfg.sfx_block) return end
-
-  local b = box_at(nx, ny)
-  if b then
-    local bx, by = nx + dx, ny + dy
-    if not walkable(bx, by) or box_at(bx, by) then
-      sfx(cfg.sfx_block) return
-    end
-    push_undo()
-    b.gx, b.gy = bx, by
-    sfx(cfg.sfx_push)
-  else
-    push_undo()
+  if not is_walkable(nx, ny) then
+    sfx(cfg.sfx_block)
+    return
   end
 
-  player.gx, player.gy = nx, ny
-  moves = moves + 1
+  local b, b_idx = box_at(nx, ny)
+  local pushed_box = nil
 
-  if is_win() then                     -- level solved -> arm auto-advance
+  if b then
+    local bx, by = b.gx + dx, b.gy + dy
+    if not is_walkable(bx, by) or box_at(bx, by) then
+      sfx(cfg.sfx_block)
+      return
+    end
+    pushed_box = {idx = b_idx, from_gx = b.gx, from_gy = b.gy}
+    b.gx, b.gy = bx, by
+    pushes = pushes + 1
+    sfx(cfg.sfx_push)
+  else
+    sfx(cfg.sfx_step)
+  end
+
+  table.insert(history, {
+    player = {gx = player.gx, gy = player.gy},
+    box = pushed_box,
+  })
+  if #history > cfg.max_undo then table.remove(history, 1) end
+
+  player.gx, player.gy = nx, ny
+  steps = steps + 1
+
+  if check_win() then
     cleared = true
-    clear_wait = cfg.win_delay
+    clear_timer = 0
     sfx(cfg.sfx_win)
   end
 end
 
---------------------------------------------------------------------
--- RENDER
---------------------------------------------------------------------
-local function slide_to(e)
-  e.vx = e.vx + (e.gx - e.vx) * cfg.slide
-  e.vy = e.vy + (e.gy - e.vy) * cfg.slide
-  if math.abs(e.gx - e.vx) < 0.01 then e.vx = e.gx end
-  if math.abs(e.gy - e.vy) < 0.01 then e.vy = e.gy end
+local function undo()
+  if #history == 0 or cleared then return end
+  local h = table.remove(history)
+  player.gx, player.gy = h.player.gx, h.player.gy
+  if h.box then
+    local b = boxes[h.box.idx]
+    if b then
+      b.gx, b.gy = h.box.from_gx, h.box.from_gy
+      pushes = math.max(0, pushes - 1)
+    end
+  end
+  steps = math.max(0, steps - 1)
+  sfx(cfg.sfx_step)
 end
 
-local function draw()
-  cls(0)
-  local lv = cur()
-  map(lv.x, lv.y, lv.w, lv.h, cfg.scr_x, cfg.scr_y)
+--------------------------------------------------------------------
+-- INPUT HANDLING
+--------------------------------------------------------------------
+local function handle_input()
+  local dirs = {
+    [0] = {0, -1},  -- Up
+    [1] = {0, 1},   -- Down
+    [2] = {-1, 0},  -- Left
+    [3] = {1, 0},   -- Right
+  }
 
-  for i = 1, #boxes do
-    local b = boxes[i]
-    local id = on_goal(b.gx, b.gy) and cfg.t_boxok or cfg.t_box
-    spr(id, cfg.scr_x + b.vx * 8, cfg.scr_y + b.vy * 8, 0)
+  local pressed_dir = -1
+  for d = 0, 3 do
+    if btn(d) then pressed_dir = d break end
   end
-  spr(cfg.t_player, cfg.scr_x + player.vx * 8, cfg.scr_y + player.vy * 8, 0)
 
-  local done = 0
-  for i = 1, #boxes do if on_goal(boxes[i].gx, boxes[i].gy) then done = done + 1 end end
-
-  print("SOKOBAN", 3, 3, 12)
-  print("LEVEL " .. level_no .. "/" .. #levels, 3, 13, 15)
-  print("MOVES " .. moves, 3, 23, 15)
-  print("UNDO  " .. #history, 3, 33, 13)
-  print("CRATE " .. done .. "/" .. #boxes, 3, 103, 11)
-  print("TOTAL " .. #levels .. " LEVELS", 3, 113, 13)
-  print("X UNDO  R RESET", 138, 127, 13)
-
-  if cleared then
-    rect(56, 46, 128, 44, 0)
-    rectb(56, 46, 128, 44, 4)
-    if level_no >= #levels then
-      print("ALL LEVELS CLEAR!", 62, 56, 4)
-      print("WRAP TO LEVEL 1", 70, 68, 11)
+  if pressed_dir ~= -1 then
+    if pressed_dir ~= hold_dir then
+      hold_dir = pressed_dir
+      hold_time = 0
+      local d = dirs[pressed_dir]
+      move(d[1], d[2])
     else
-      print("LEVEL " .. level_no .. " CLEAR!", 66, 56, 4)
-      print("NEXT IN " .. math.max(1, math.ceil(clear_wait / 60)) .. "s", 84, 68, 11)
-    end
-    print("Z: SKIP NOW", 82, 80, 15)
-  end
-end
-
---------------------------------------------------------------------
--- MAIN LOOP
---------------------------------------------------------------------
-function BOOT()
-  fset(cfg.t_wall, cfg.solid_flag, true)
-  scan_levels()                       -- auto-detect every level on the map
-  load_level(1)
-end
-
-function TIC()
-  if cleared then
-    clear_wait = clear_wait - 1
-    if clear_wait <= 0 or btnp(4) or btnp(6) or keyp(26) then
-      load_level(level_no + 1)        -- auto-advance to the next level
-    end
-  elseif #boxes == 0 then
-    -- defensive: a level with no crates is skipped (bounded, never loops)
-    if empty_skip < #levels then
-      empty_skip = empty_skip + 1
-      load_level(level_no + 1)
+      hold_time = hold_time + 1
+      if hold_time >= cfg.repeat_delay and (hold_time - cfg.repeat_delay) % cfg.repeat_rate == 0 then
+        local d = dirs[pressed_dir]
+        move(d[1], d[2])
+      end
     end
   else
-    local h, p = cfg.repeat_delay, cfg.repeat_rate
-    if btnp(0, h, p) or keyp(23, h, p) then try_move(0, -1) end   -- up   / W
-    if btnp(1, h, p) or keyp(19, h, p) then try_move(0, 1)  end   -- down / S
-    if btnp(2, h, p) or keyp(1,  h, p) then try_move(-1, 0) end   -- left / A
-    if btnp(3, h, p) or keyp(4,  h, p) then try_move(1, 0)  end   -- right/ D
-    if btnp(5) or keyp(26) then undo() end                        -- X / Z
+    hold_dir = -1
+    hold_time = 0
   end
 
-  if keyp(18) then load_level(level_no) end                       -- R = retry level
-  if keyp(27) then exit() end                                     -- ESC
+  -- [Z] Undo, [X] Restart, [A] Next room, [S] Prev room
+  if btnp(4) or keyp(26) then undo() end
+  if btnp(5) or keyp(18) then load_level(level_no) end
+  if btnp(6) then load_level(level_no + 1) end
+  if btnp(7) then load_level(level_no - 1) end
+end
 
-  slide_to(player)
-  for i = 1, #boxes do slide_to(boxes[i]) end
-  draw()
+--------------------------------------------------------------------
+-- INIT & MAIN LOOP
+--------------------------------------------------------------------
+scan_levels()
+load_level(1)
+
+function TIC()
+  handle_input()
+
+  -- Visual interpolation
+  player.vx = player.vx + (player.gx - player.vx) * cfg.slide_speed
+  player.vy = player.vy + (player.gy - player.vy) * cfg.slide_speed
+  for i = 1, #boxes do
+    local b = boxes[i]
+    b.vx = b.vx + (b.gx - b.vx) * cfg.slide_speed
+    b.vy = b.vy + (b.gy - b.vy) * cfg.slide_speed
+  end
+
+  cls(0)
+
+  local rm = levels[level_no]
+  if rm then
+    -- 1. Full-screen 30x17 room map (240x136 pixels)
+    map(rm.ox, rm.oy, cfg.room_w, cfg.room_h, 0, 0)
+
+    -- 2. Draw boxes
+    for i = 1, #boxes do
+      local b = boxes[i]
+      local px = math.floor(b.vx * 8)
+      local py = math.floor(b.vy * 8)
+      local spr_id = is_on_goal(b) and cfg.spr_box_done or cfg.spr_box
+      spr(spr_id, px, py, 0)
+    end
+
+    -- 3. Draw player
+    local px = math.floor(player.vx * 8)
+    local py = math.floor(player.vy * 8)
+    spr(cfg.spr_player, px, py, 0)
+
+    -- 4. Top HUD bar
+    rect(0, 0, 240, 9, 0)
+    line(0, 9, 240, 9, 14)
+    local info = string.format("%s (%d/%d)  STEPS:%d  PUSH:%d", rm.name, level_no, #levels, steps, pushes)
+    print(info, 4, 2, 12, true, 1, true)
+    print("[Z]UNDO [X]RETRY", 160, 2, 13, true, 1, true)
+
+    -- 5. Victory celebration & auto-next stage
+    if cleared then
+      clear_timer = clear_timer + 1
+      rect(50, 52, 140, 28, 0)
+      rectb(50, 52, 140, 28, 11)
+      print("STAGE CLEARED!", 78, 58, 11, true, 1, false)
+      print("AUTO-ADVANCING...", 74, 68, 12, true, 1, true)
+
+      if clear_timer >= cfg.auto_next_delay then
+        if level_no < #levels then
+          load_level(level_no + 1)
+        else
+          rect(40, 48, 160, 36, 0)
+          rectb(40, 48, 160, 36, 11)
+          print("ALL STAGES COMPLETED!", 54, 56, 11, true, 1, false)
+          print("PRESS [X] TO PLAY AGAIN", 58, 68, 12, true, 1, true)
+          if btnp(5) then load_level(1) end
+        end
+      end
+    end
+  else
+    print("NO SOKOBAN ROOMS FOUND ON MAP", 30, 60, 6)
+    print("USE F3 MAP EDITOR TO DRAW 30x17 ROOMS", 20, 72, 12)
+  end
 end
 
 -- <TILES>
--- 001:ffffffffddddfdddddddfdddffffffffdddfdddddddfddddffffffffffffffff
--- 002:fffffffffff8fffffffffffffffffffffffff8ffffffffffffff8fffffffffff
--- 003:ffffffffff4444fff44ff44ff4ffff4ff4ffff4ff44ff44fff4444ffffffffff
--- 004:2222222223333332234444322343343223433432234444322333333222222222
--- 005:000ff00000ffff000f4cc4f00fccccf00fccccf000cccc000fccccf000f00f00
--- 006:2222222226666662267777622676676226766762267777622666666222222222
--- 007:0011110001222210122332211233332112333321122332210122221000111100
+-- 001:888888888eeeeee88ebbbbe88ebbbbe88ebbbbe88ebbbbe88eeeeee888888888
+-- 002:000000000eeeeee00e0000e00e0000e00e0000e00e0000e00eeeeee000000000
+-- 003:0000000000bbbb000beeeeb00be44eb00be44eb00beeeeb000bbbb0000000000
+-- 004:444444444ffffff44f4444f44f4ee4f44f4ee4f44f4444f44ffffff444444444
+-- 005:0033330003ffff303f3333f33ffffff30bbbbbb0bb9999bb0b9999b009000090
+-- 006:bbbbbbbbbffffffbbfbbbbfebfbeebfebfbeebfebfbbbbfebffffffbbbbbbbbb
 -- </TILES>
 
+-- <SPRITES>
+-- 001:0033330003ffff303f3333f33ffffff30bbbbbb0bb9999bb0b9999b009000090
+-- 002:444444444ffffff44f4444f44f4ee4f44f4ee4f44f4444f44ffffff444444444
+-- 003:bbbbbbbbbffffffbbfbbbbfebfbeebfebfbeebfebfbbbbfebffffffbbbbbbbbb
+-- </SPRITES>
+
 -- <MAP>
--- 003:000000000000000000007000000000000000000000000000000000000000000000000000000000007000000000000000000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 004:000000000000000000001010101010101010101000000000000000000000000000000000000000001010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 005:000000000000000000001020202020202020201000000000000000000000000000000000000000001020202020202020201010203030302020202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 006:000000000000000000001020202020202020201000000000000000000000000000000000000000001030202040402030201010202020202020202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 007:000000000000000000001020204040202020201000000000000000000000000000000000000000001020202020202020201010202040404020202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 008:000000000000000000001020202020202020201000000000000000000000000000000000000000001020202020202020201010202020202020202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 009:000000000000000000001020202020205020201000000000000000000000000000000000000000001020202020202020201010202020202050202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 010:000000000000000000001020302020202030201000000000000000000000000000000000000000001020202020502020201010202020202020202010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 011:000000000000000000001010101010101010101000000000000000000000000000000000000000001010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 000:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 001:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 002:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 003:101010101010101010101010101010101010101010101010101010101010101010101010101010102020202020202020202010101010101010101010101010101010101010202020202020202020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 004:101010101010101010101020202020202020201010101010101010101010101010101010101010102020201020201020202010101010101010101010101010101010101010202020201020201020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 005:101010101010101010101020204030202020201010101010101010101010101010101010101010102020204020204020202010101010101010101010101010101010101010202040203020203020402020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 006:101010101010101010101020201020202020201010101010101010101010101010101010101010102020203020203020202010101010101010101010101010101010101010202020201020201020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 007:101010101010101010101020204030202020201010101010101010101010101010101010101010102020202040402020202010101010101010101010101010101010101010202030204020204020302020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 008:101010101010101010101020205020202020201010101010101010101010101010101010101010102020202030302020202010101010101010101010101010101010101010202020201020201020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 009:101010101010101010101020202020202020201010101010101010101010101010101010101010102020202020502020202010101010101010101010101010101010101010202020202020502020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 010:101010101010101010101010101010101010101010101010101010101010101010101010101010102020202020202020202010101010101010101010101010101010101010202020202020202020202020101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 011:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 012:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 013:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 014:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 015:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 016:101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 -- </MAP>
 
 -- <WAVES>
@@ -322,9 +410,10 @@ end
 -- </WAVES>
 
 -- <SFX>
--- 000:0232f3024c20218201d4200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 001:0330e3034e3037e303be3030e3034e3037e303ce3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
--- 002:0243f304383000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 000:0243f304383000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 001:0232f3024c20218201d4200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 002:0330e3034e3037e303be3030e3034e3037e303ce3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+-- 003:0243f304383000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 -- </SFX>
 
 -- <FLAGS>
