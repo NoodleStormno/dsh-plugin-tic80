@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
-    "test": "node --test lib/test/**/*.test.js",
+    "test": "node --test \"lib/test/*.test.js\"",
     "prepublishOnly": "npm run build && npm test"
   },
   "dsh": {
