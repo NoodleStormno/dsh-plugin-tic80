@@ -266,6 +266,10 @@ export class WebStudioServer {
       this.wss.on('connection', (ws) => this.handleWsConnection(ws));
 
       this.server.listen(this.port, () => {
+        const addr = this.server?.address();
+        if (addr && typeof addr === 'object') {
+          this.port = addr.port;
+        }
         this.logs.push(`Standalone Studio listening on http://127.0.0.1:${this.port}`);
         resolve(this.getStatus());
       });

@@ -39,7 +39,7 @@ describe('TIC-80 Web Runner & WASM Server', () => {
   it('starts standalone server and serves official WASM binary', async () => {
     const server = new WebStudioServer();
     const cart = new Cartridge();
-    const testPort = 3099;
+    const testPort = 3096;
 
     const status = await server.start(cart, testPort);
     assert.strictEqual(status.running, true);

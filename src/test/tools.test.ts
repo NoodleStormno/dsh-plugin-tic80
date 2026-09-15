@@ -204,14 +204,14 @@ end
     const runTool = toolMap.get('tic80_run')!;
     const statusTool = toolMap.get('tic80_studio_status')!;
 
-    const runRes: any = await runTool.execute({ mode: 'web', port: 3099 }, {} as any);
+    const runRes: any = await runTool.execute({ mode: 'web', port: 3095 }, {} as any);
     assert.strictEqual(runRes.success, true);
     assert.strictEqual(runRes.mode, 'web');
-    assert.ok(runRes.url.includes('3099'));
+    assert.ok(runRes.url.includes('3095'));
 
     const statusRes: any = await statusTool.execute({}, {} as any);
     assert.strictEqual(statusRes.running, true);
-    assert.strictEqual(statusRes.port, 3099);
+    assert.strictEqual(statusRes.port, 3095);
 
     await studio.stop();
   });
