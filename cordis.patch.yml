@@ -1,5 +1,5 @@
 # DeepSeek Harness (dsh) cordis configuration patch for dsh-plugin-tic80
-# Usage: npx @deepseek-ai/dsh web --patch "E:/dsh-plugin-tic80/cordis.patch.yml"
+# Usage: npx @deepseek-ai/dsh web --patch "./cordis.patch.yml"
 - insert:
     - id: tic80
       name: dsh-plugin-tic80

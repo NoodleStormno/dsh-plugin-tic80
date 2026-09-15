@@ -1,0 +1,6 @@
+url: https://github.com/NoodleStormno/dsh-plugin-tic80
+name: NoodleStormno/dsh-plugin-tic80
+category: dev
+description:
+  en: 'TIC-80 fantasy console plugin for retro game prototyping, pixel art, maps, and chiptune with live web hot-reload.'
+  zh: 'TIC-80 幻想计算机全功能生态插件，支持对话式极速游戏原型制作、像素精灵、地图与芯片音乐，并在内嵌画板实时热重载。'
