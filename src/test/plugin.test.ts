@@ -1,6 +1,7 @@
 import { test, describe } from 'node:test';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { Context } from '@deepseek-ai/cordis';
 import * as Tic80Plugin from '../index.js';
 
@@ -81,18 +82,19 @@ describe('Cordis Plugin Lifecycle', () => {
 
   test('resolveWorkspaceDir discovers workspace from workspaceRegistry, env, or fallback', () => {
     // 1. When workspaceRegistry is available
+    const mockPath = path.join(os.tmpdir(), 'mock-dsh-workspace');
     const mockCtx = {
       workspaceRegistry: {
-        list: () => [{ path: 'E:\\MockWorkspace', title: 'Mock' }],
+        list: () => [{ path: mockPath, title: 'Mock' }],
       },
     };
     const ws1 = Tic80Plugin.resolveWorkspaceDir(mockCtx as any);
-    assert.strictEqual(ws1, path.resolve('E:\\MockWorkspace'));
+    assert.strictEqual(ws1, path.resolve(mockPath));
 
     // 2. When DSH_WORKSPACE env is set
     const origEnv = process.env.DSH_WORKSPACE;
     try {
-      const testWs = path.resolve('E:\\');
+      const testWs = path.resolve(os.tmpdir());
       process.env.DSH_WORKSPACE = testWs;
       const ws2 = Tic80Plugin.resolveWorkspaceDir({} as any);
       assert.strictEqual(ws2, testWs);
@@ -102,7 +104,7 @@ describe('Cordis Plugin Lifecycle', () => {
   });
 
   test('resolveCartridgePath resolves relative to workspace and avoids plugin package source', () => {
-    const ws = 'E:\\MyCustomWorkspace';
+    const ws = path.join(os.tmpdir(), 'custom-workspace');
     // When configPath is provided
     const cart1 = Tic80Plugin.resolveCartridgePath(ws, 'games/puzzle.lua');
     assert.strictEqual(cart1, path.resolve(ws, 'games/puzzle.lua'));
