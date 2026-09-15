@@ -44,6 +44,7 @@ export function buildStudioSystemPrompt(options: StudioPromptOptions): string {
     '- The active cartridge is ALREADY RUNNING at `' + cartPath + '`.',
     '- Layout: Left column = DSH Navigation/Sidebar, Middle column = TIC-80 Live Console & Studio, Right column = AI Chat Conversation.',
     '- Real-Time Sync: Any edits made to `' + cartPath + '` or via tools automatically hot-reload into the middle-column game screen via WebSocket.',
+    '- CLI & Export: Use `tic80_cli` to execute TIC-80 console commands (e.g. `export html`, `export native`, `export sprites`, `run`, `save`) and inspect console output or runtime errors.',
     '',
     '## ⚡ ZERO TURN-WASTING DIRECTIVE (DO NOT RE-INITIALIZE)',
     '- A standard, fully-playable blank cartridge is ALREADY LOADED and running right now in the middle screen!',

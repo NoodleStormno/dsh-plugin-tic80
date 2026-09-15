@@ -6,7 +6,8 @@
  */
 export interface NativeRunOptions {
     tic80Path?: string;
-    cartPath: string;
+    cartPath?: string;
+    workspaceDir?: string;
     cli?: boolean;
     commands?: string[];
     fullscreen?: boolean;
@@ -17,10 +18,13 @@ export interface NativeRunResult {
     success: boolean;
     stdout: string;
     stderr: string;
+    output: string;
+    errors: string[];
     exitCode: number | null;
 }
 export declare class NativeRunner {
     static findExecutable(explicitPath?: string): string | null;
+    static parseErrors(output: string): string[];
     static run(options: NativeRunOptions): Promise<NativeRunResult>;
 }
 //# sourceMappingURL=native-runner.d.ts.map

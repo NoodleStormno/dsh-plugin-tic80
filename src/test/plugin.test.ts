@@ -23,7 +23,7 @@ describe('Cordis Plugin Lifecycle', () => {
       autoRun: false,
     });
 
-    assert.strictEqual(registeredTools.length, 13);
+    assert.strictEqual(registeredTools.length, 14);
     assert.strictEqual(Tic80Plugin.name, 'dsh-plugin-tic80');
     assert.deepStrictEqual(Tic80Plugin.inject, ['tools']);
   });

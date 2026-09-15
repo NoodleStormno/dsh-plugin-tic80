@@ -178,7 +178,7 @@ export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
     getWorkspaceDir: () => resolveWorkspaceDir(ctx),
   };
 
-  // 2. Register all 13 TIC-80 model tools
+  // 2. Register all 14 TIC-80 model tools
   const tools = createTic80Tools(toolCtx);
   for (const tool of tools) {
     ctx.tools.register(tool);

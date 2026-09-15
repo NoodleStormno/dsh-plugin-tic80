@@ -14,6 +14,7 @@ export interface StudioStatus {
     connectedClients: number;
     url: string;
     lastLogs: string[];
+    recentErrors?: string[];
 }
 export declare function resolveVendorFile(fileName: string): string | null;
 export declare function resolveFengariWeb(): string | null;
@@ -23,6 +24,7 @@ export declare class WebStudioServer {
     private clients;
     private currentCart;
     private logs;
+    private errors;
     private port;
     private boundToHost;
     /**
@@ -37,6 +39,8 @@ export declare class WebStudioServer {
     start(cart: Cartridge, port?: number): Promise<StudioStatus>;
     broadcastUpdate(cart: Cartridge, updateType: 'CODE' | 'SPRITES' | 'MAP' | 'AUDIO' | 'PALETTE' | 'ALL'): void;
     stop(): Promise<void>;
+    getRecentErrors(): string[];
+    clearErrors(): void;
     getStatus(): StudioStatus;
     /**
      * Inject TIC-80 Studio Pane directly into DSH's index.html

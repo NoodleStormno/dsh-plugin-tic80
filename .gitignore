@@ -10,10 +10,9 @@ temp_*
 export/
 .local/
 
-# Keep TIC-80 PRO binaries and assets
+# Keep TIC-80 official binaries and assets
 !vendor/bin/tic80.exe
 !vendor/bin/SDL2.dll
-!tic80.exe
 !SDL2.dll
 !assets/
 

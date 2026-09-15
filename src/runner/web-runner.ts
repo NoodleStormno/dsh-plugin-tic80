@@ -26,6 +26,7 @@ export interface StudioStatus {
   connectedClients: number;
   url: string;
   lastLogs: string[];
+  recentErrors?: string[];
 }
 
 export function resolveVendorFile(fileName: string): string | null {
@@ -63,6 +64,7 @@ export class WebStudioServer {
   private clients: Set<WebSocket> = new Set();
   private currentCart: Cartridge | null = null;
   private logs: string[] = [];
+  private errors: string[] = [];
   private port: number = 3088;
   private boundToHost: boolean = false;
 
@@ -179,6 +181,10 @@ export class WebStudioServer {
         if (data.type === 'LOG' || data.type === 'ERROR') {
           this.logs.push(`[${data.type}] ${data.message}`);
           if (this.logs.length > 50) this.logs.shift();
+          if (data.type === 'ERROR') {
+            this.errors.push(String(data.message));
+            if (this.errors.length > 30) this.errors.shift();
+          }
         }
       } catch {
         // ignore
@@ -319,6 +325,14 @@ export class WebStudioServer {
     });
   }
 
+  getRecentErrors(): string[] {
+    return [...this.errors];
+  }
+
+  clearErrors(): void {
+    this.errors = [];
+  }
+
   getStatus(): StudioStatus {
     return {
       running: this.boundToHost || (this.server !== null && this.server.listening),
@@ -326,6 +340,7 @@ export class WebStudioServer {
       connectedClients: this.clients.size,
       url: this.boundToHost ? `/tic80/` : `http://127.0.0.1:${this.port}`,
       lastLogs: [...this.logs].slice(-20),
+      recentErrors: [...this.errors].slice(-10),
     };
   }
 
@@ -706,6 +721,7 @@ export class WebStudioServer {
       </div>
       <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
       <div id="toast">⚡ 热重载已同步</div>
+      <div id="error-banner" style="display:none; position:absolute; bottom:0; left:0; right:0; background:rgba(180,20,30,0.92); color:#fff; padding:6px 12px; font-size:11px; z-index:90; border-top:1px solid #f87171; white-space:pre-wrap; word-break:break-all; box-shadow:0 -2px 10px rgba(0,0,0,0.5);"></div>
     </div>
   </div>
 
@@ -714,12 +730,19 @@ export class WebStudioServer {
     const canvas = document.getElementById('canvas');
     const loadingCover = document.getElementById('loading-cover');
     const toast = document.getElementById('toast');
+    const errorBanner = document.getElementById('error-banner');
 
     function showToast(msg) {
       if (!toast) return;
       toast.textContent = msg;
       toast.style.display = 'block';
       setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
+
+    function showErrorBanner(msg) {
+      if (!errorBanner) return;
+      errorBanner.textContent = '❌ ' + msg;
+      errorBanner.style.display = 'block';
     }
 
     function hideLoading() {
@@ -736,6 +759,12 @@ export class WebStudioServer {
     if (loadingCover) loadingCover.addEventListener('click', hideLoading);
     document.addEventListener('keydown', hideLoading, { once: true });
     canvas.addEventListener('click', () => { canvas.focus(); hideLoading(); });
+
+    window.addEventListener('error', function(e) {
+      const msg = e.message || (e.error ? e.error.message : String(e));
+      showErrorBanner(msg);
+      try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ERROR', message: msg })); } catch(err){}
+    });
 
     // Dispatch keyboard event to canvas and window for SDL
     window.sendKey = function(key, code, keyCode, ctrl = false) {
@@ -786,9 +815,14 @@ export class WebStudioServer {
       },
       print: function(text) {
         console.log('[TIC-80]', text);
+        try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'LOG', message: text })); } catch(e){}
       },
       printErr: function(text) {
         console.warn('[TIC-80 ERR]', text);
+        if (text && !text.includes('deprecated') && !text.includes('pre-main prep')) {
+          showErrorBanner(text);
+        }
+        try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ERROR', message: text })); } catch(e){}
       },
       setStatus: function(text) {
         if (text) console.log('[TIC-80 Status]', text);
