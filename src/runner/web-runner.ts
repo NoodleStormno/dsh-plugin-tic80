@@ -11,8 +11,14 @@
 import * as http from 'node:http';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Cartridge } from '../core/cartridge.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const require = createRequire(import.meta.url);
 
 export interface StudioStatus {
   running: boolean;
@@ -24,12 +30,29 @@ export interface StudioStatus {
 
 export function resolveVendorFile(fileName: string): string | null {
   const candidates = [
-    path.resolve('E:/dsh-plugin-tic80/vendor/tic80-web', fileName),
     path.resolve(process.cwd(), 'vendor/tic80-web', fileName),
+    path.resolve(__dirname, '../../vendor/tic80-web', fileName),
+    path.resolve(__dirname, '../vendor/tic80-web', fileName),
     path.resolve(process.cwd(), 'node_modules/dsh-plugin-tic80/vendor/tic80-web', fileName),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
+export function resolveFengariWeb(): string | null {
+  try {
+    const resolved = require.resolve('fengari-web/dist/fengari-web.js');
+    if (fs.existsSync(resolved)) return resolved;
+  } catch {}
+  const fallbacks = [
+    path.resolve(process.cwd(), 'node_modules/fengari-web/dist/fengari-web.js'),
+    path.resolve(__dirname, '../../node_modules/fengari-web/dist/fengari-web.js'),
+    path.resolve(__dirname, '../node_modules/fengari-web/dist/fengari-web.js'),
+  ];
+  for (const p of fallbacks) {
+    if (fs.existsSync(p)) return p;
   }
   return null;
 }
@@ -88,20 +111,11 @@ export class WebStudioServer {
             res.end('tic80.wasm not found');
           }
         } else if (rawPath === '/tic80/vendor/fengari-web.js') {
-          const possiblePaths = [
-            path.resolve('E:/dsh-plugin-tic80/node_modules/fengari-web/dist/fengari-web.js'),
-            path.resolve(process.cwd(), 'node_modules/fengari-web/dist/fengari-web.js'),
-          ];
-          let found = false;
-          for (const p of possiblePaths) {
-            if (fs.existsSync(p)) {
-              res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-              res.end(fs.readFileSync(p));
-              found = true;
-              break;
-            }
-          }
-          if (!found) {
+          const fengariFile = resolveFengariWeb();
+          if (fengariFile && fs.existsSync(fengariFile)) {
+            res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+            res.end(fs.readFileSync(fengariFile));
+          } else {
             res.writeHead(404);
             res.end('fengari-web.js not found');
           }
@@ -216,8 +230,8 @@ export class WebStudioServer {
             res.end('tic80.wasm not found');
           }
         } else if (url === '/vendor/fengari-web.js' || url === '/tic80/vendor/fengari-web.js') {
-          const fengariFile = path.resolve('E:/dsh-plugin-tic80/node_modules/fengari-web/dist/fengari-web.js');
-          if (fs.existsSync(fengariFile)) {
+          const fengariFile = resolveFengariWeb();
+          if (fengariFile && fs.existsSync(fengariFile)) {
             res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
             res.end(fs.readFileSync(fengariFile));
           } else {

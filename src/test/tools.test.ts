@@ -1,9 +1,10 @@
 import { test, describe, after } from 'node:test';
 import * as assert from 'node:assert';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Cartridge } from '../core/cartridge.js';
 import { WebStudioServer } from '../runner/web-runner.js';
 import { createTic80Tools, ToolContext } from '../tools/index.js';
-import * as fs from 'node:fs/promises';
 
 describe('DeepSeek Harness TIC-80 Tools Suite', () => {
   const cart = new Cartridge();
@@ -182,7 +183,7 @@ end
 
   test('tic80_export exports files to directory', async () => {
     const expTool = toolMap.get('tic80_export')!;
-    const exportDir = 'E:/dsh-plugin-tic80/test_export';
+    const exportDir = path.resolve(process.cwd(), 'test_export');
     const res: any = await expTool.execute({
       format: 'all',
       outputDir: exportDir,

@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import * as assert from 'node:assert';
+import * as path from 'node:path';
 import { Context } from '@deepseek-ai/cordis';
 import * as Tic80Plugin from '../index.js';
 
@@ -27,8 +28,9 @@ describe('Cordis Plugin Lifecycle', () => {
   });
 
   test('generates system prompt with complete OpenTIC 10 sections', () => {
+    const sampleCartPath = path.resolve(process.cwd(), 'cartridge/game.lua');
     const prompt = Tic80Plugin.buildStudioSystemPrompt({
-      cartPath: 'E:/dsh-plugin-tic80/cartridge/game.lua',
+      cartPath: sampleCartPath,
       cartCode: '-- title: Test\nfunction TIC() end\n',
     });
 
@@ -45,6 +47,6 @@ describe('Cordis Plugin Lifecycle', () => {
     assert.ok(prompt.includes('### 10. Key Directives'), 'Prompt must contain Section 10 Key Directives');
     assert.ok(prompt.includes('NO OS LIBRARY'), 'Prompt must explicitly instruct that os library does not exist');
     assert.ok(prompt.includes('nil'), 'Prompt must warn against nil value errors when indexing os');
-    assert.ok(prompt.includes('E:/dsh-plugin-tic80/cartridge/game.lua'), 'Prompt must bind active cartridge path');
+    assert.ok(prompt.includes(sampleCartPath), 'Prompt must bind active cartridge path');
   });
 });

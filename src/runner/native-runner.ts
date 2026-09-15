@@ -37,15 +37,26 @@ export class NativeRunner {
       return explicitPath;
     }
 
+    const binName = process.platform === 'win32' ? 'tic80.exe' : 'tic80';
     const candidatePaths = [
-      path.resolve(process.cwd(), 'tic80.exe'),
-      path.resolve('E:/dsh-plugin-tic80/tic80.exe'),
-      path.resolve('E:/dsh-plugin-tic80/vendor/bin/tic80.exe'),
-      path.resolve(__dirname, '../../vendor/bin/tic80.exe'),
-      path.resolve(__dirname, '../../tic80.exe'),
-      'C:/Program Files/TIC-80/tic80.exe',
-      'C:/Users/w2578/Downloads/tic80.exe',
+      path.resolve(process.cwd(), binName),
+      path.resolve(process.cwd(), 'vendor/bin', binName),
+      path.resolve(__dirname, '../../vendor/bin', binName),
+      path.resolve(__dirname, '../../', binName),
+      path.resolve(__dirname, '../vendor/bin', binName),
     ];
+
+    if (process.platform === 'win32') {
+      candidatePaths.push(
+        'C:/Program Files/TIC-80/tic80.exe',
+        path.resolve(process.env.USERPROFILE || '', 'Downloads/tic80.exe')
+      );
+    } else {
+      candidatePaths.push(
+        '/usr/local/bin/tic80',
+        '/usr/bin/tic80'
+      );
+    }
 
     for (const p of candidatePaths) {
       if (fs.existsSync(p)) return p;

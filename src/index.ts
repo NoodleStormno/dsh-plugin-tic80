@@ -9,12 +9,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Context } from '@deepseek-ai/cordis';
 import { Cartridge } from './core/cartridge.js';
 import { createTemplate } from './templates/index.js';
 import { WebStudioServer } from './runner/web-runner.js';
 import { createTic80Tools, ToolContext } from './tools/index.js';
 import { buildStudioSystemPrompt, TIC80_SYSTEM_PROMPT } from './prompts/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export { buildStudioSystemPrompt, TIC80_SYSTEM_PROMPT };
 
@@ -28,9 +32,9 @@ export const name = 'dsh-plugin-tic80';
 export const inject = ['tools'];
 
 export interface Tic80PluginConfig {
-  /** Default starting template when booting the plugin (minimal, platformer, sokoban, rpg, shmup) */
-  defaultTemplate?: string;
-  /** Automatically start the Web Live Studio standalone server (port 3088) */
+  /** Default game genre template to initialize if no cart is loaded */
+  defaultTemplate?: 'minimal' | 'platformer' | 'sokoban' | 'rpg' | 'shmup';
+  /** Automatically start the Web Live Studio server on boot */
   autoRun?: boolean;
   /** Port for the Web Live Studio server (default 3088) */
   webStudioPort?: number;
@@ -39,10 +43,15 @@ export interface Tic80PluginConfig {
 }
 
 export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
-  // 1. Resolve default blank cartridge file
-  const defaultCartPath = config.cartFilePath 
-    ? path.resolve(config.cartFilePath)
-    : path.resolve('E:/dsh-plugin-tic80/cartridge/game.lua');
+  // 1. Resolve default blank cartridge file portably
+  const candidateCartPaths = [
+    config.cartFilePath ? path.resolve(config.cartFilePath) : null,
+    path.resolve(process.cwd(), 'cartridge/game.lua'),
+    path.resolve(__dirname, '../cartridge/game.lua'),
+    path.resolve(__dirname, '../../cartridge/game.lua'),
+  ].filter(Boolean) as string[];
+
+  const defaultCartPath = candidateCartPaths.find(p => fs.existsSync(p)) || candidateCartPaths[0];
 
   let initialCart: Cartridge;
   if (fs.existsSync(defaultCartPath)) {

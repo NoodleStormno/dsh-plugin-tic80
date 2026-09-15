@@ -6,11 +6,14 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 describe('TIC-80 Native Runner CLI Integration', () => {
-  test('finds tic80 executable and executes headless CLI command', async () => {
+  test('finds tic80 executable and executes headless CLI command', async (t) => {
     const exe = NativeRunner.findExecutable();
-    assert.ok(exe, 'tic80.exe should be discoverable in project root or system');
+    if (!exe) {
+      t.skip('tic80 native executable not available in environment');
+      return;
+    }
 
-    const tempCartPath = path.resolve('E:/dsh-plugin-tic80/test_native.lua');
+    const tempCartPath = path.resolve(process.cwd(), 'test_native.lua');
     const cart = new Cartridge();
     cart.code = `function TIC()\n  exit()\nend\n`;
     await fs.writeFile(tempCartPath, cart.toText(), 'utf8');
@@ -27,9 +30,15 @@ describe('TIC-80 Native Runner CLI Integration', () => {
     await fs.rm(tempCartPath, { force: true });
   });
 
-  test('verifies TIC-80 PRO executes .lua cartridge and exports .tic', async () => {
-    const tempCartPath = path.resolve('E:/dsh-plugin-tic80/test_pro_load.lua');
-    const tempTicPath = path.resolve('E:/dsh-plugin-tic80/test_pro_out.tic');
+  test('verifies TIC-80 PRO executes .lua cartridge and exports .tic', async (t) => {
+    const exe = NativeRunner.findExecutable();
+    if (!exe) {
+      t.skip('tic80 native executable not available in environment');
+      return;
+    }
+
+    const tempCartPath = path.resolve(process.cwd(), 'test_pro_load.lua');
+    const tempTicPath = path.resolve(process.cwd(), 'test_pro_out.tic');
     const cart = new Cartridge();
     cart.code = `function TIC()\n  trace("PRO_LUA_OK")\n  exit()\nend\n`;
     await fs.writeFile(tempCartPath, cart.toText(), 'utf8');

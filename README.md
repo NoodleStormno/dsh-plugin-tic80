@@ -1,5 +1,6 @@
 # dsh-plugin-tic80
 
+[![CI](https://github.com/NoodleStormno/dsh-plugin-tic80/actions/workflows/ci.yml/badge.svg)](https://github.com/NoodleStormno/dsh-plugin-tic80/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/badge/npm-1.0.0-blue.svg)](https://www.npmjs.com/package/dsh-plugin-tic80)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![DeepSeek Harness](https://img.shields.io/badge/dsh-plugin-purple.svg)](https://github.com/deepseek-ai/deepseek-harness)

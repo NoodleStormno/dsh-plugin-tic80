@@ -1,7 +1,7 @@
 /**
  * TIC-80 OpenTIC System Prompt
  * 
- * Ported from E:/OpenTIC/tools/bridge/tic-omp-bridge.js
+ * OpenTIC / TIC-80 System Prompt Specification
  * Contains the complete 10-section prompt specification, WYSIWYG guidelines,
  * built-in API reference, asset specifications, and DSH embedded studio directives.
  * Includes explicit warnings that the standard 'os' library is NIL in TIC-80.

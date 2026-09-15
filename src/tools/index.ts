@@ -666,7 +666,7 @@ export function createTic80Tools(toolCtx: ToolContext) {
         }));
       } else {
         // Native runner
-        const tempCartPath = path.resolve('E:/dsh-plugin-tic80/temp_run.lua');
+        const tempCartPath = path.resolve(process.cwd(), 'temp_run.lua');
         await fs.writeFile(tempCartPath, toolCtx.cartridge.toText(), 'utf8');
 
         const res = await NativeRunner.run({
@@ -698,7 +698,7 @@ export function createTic80Tools(toolCtx: ToolContext) {
       },
       outputDir: {
         type: 'string',
-        description: 'Destination directory path (default: E:/dsh-plugin-tic80/export)',
+        description: 'Destination directory path (default: ./export)',
       },
       filename: {
         type: 'string',
@@ -710,7 +710,7 @@ export function createTic80Tools(toolCtx: ToolContext) {
       render: (_args, val) => [{ type: 'text', text: JSON.stringify(val, null, 2) }],
     },
     async execute(args): Promise<any> {
-      const outputDir = path.resolve(args.outputDir || 'E:/dsh-plugin-tic80/export');
+      const outputDir = path.resolve(args.outputDir || path.resolve(process.cwd(), 'export'));
       const format = (args.format as any) || 'all';
       const result = await CartridgeExporter.export(toolCtx.cartridge, {
         format,
