@@ -24,12 +24,15 @@ export class Cartridge {
     input: 'gamepad',
   };
 
-  code: string = `function TIC()
-  cls(13)
-  spr(1, 100, 60, 0)
-  print("HELLO TIC-80!", 84, 80, 15)
-end
-`;
+  private _code: string = '';
+
+  get code(): string {
+    return this._code;
+  }
+
+  set code(val: string) {
+    this.setCode(val);
+  }
 
   palette: Palette = new Palette();
   sprites: SpriteSheet = new SpriteSheet();
@@ -38,8 +41,63 @@ end
 
   constructor(initialCode?: string) {
     if (initialCode) {
-      this.code = initialCode;
+      this.setCode(initialCode);
+    } else {
+      this.setCode(`function TIC()
+  cls(13)
+  spr(1, 100, 60, 0)
+  print("HELLO TIC-80!", 84, 80, 15)
+end
+`);
     }
+  }
+
+  /**
+   * Set and sanitize game code, extracting metadata tags into this.metadata
+   * and ensuring that leading metadata headers and duplicate blocks are cleanly stripped.
+   * If a full cartridge (including asset chunks) is passed, cleanly load via loadFromText.
+   */
+  setCode(newCode: string): void {
+    // If newCode contains asset tags (full cartridge file passed), route through loadFromText
+    if (/^--\s*<(TILES|SPRITES|MAP|WAVES|SFX|PATTERNS|TRACKS|FLAGS|PALETTE)>/im.test(newCode)) {
+      this.loadFromText(newCode);
+      return;
+    }
+
+    const lines = (newCode || '').split(/\r?\n/);
+    const metaTagRegex = /^--\s*(title|author|desc|script|input|saveid|sync|version):\s*(.*)$/i;
+
+    let idx = 0;
+    // Consume any leading blank lines or metadata lines (including repeated header blocks)
+    while (idx < lines.length) {
+      const line = lines[idx];
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        idx++;
+        continue;
+      }
+      const match = trimmed.match(metaTagRegex);
+      if (match) {
+        const key = match[1].toLowerCase();
+        const val = match[2].trim();
+        (this.metadata as any)[key] = val;
+        idx++;
+        continue;
+      }
+      break;
+    }
+
+    // Also guard against any trailing asset tags
+    const remainingLines: string[] = [];
+    for (let i = idx; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^--\s*<[A-Za-z0-9_]+>/.test(line.trim())) {
+        break;
+      }
+      remainingLines.push(line);
+    }
+
+    this._code = remainingLines.join('\n').trimStart();
   }
 
   // ==========================================
@@ -82,15 +140,7 @@ end
       }
 
       if (inCode) {
-        // Parse metadata tags at top of file
-        const metaMatch = trimmed.match(/^--\s*([a-zA-Z0-9_-]+):\s*(.*)$/);
-        if (metaMatch && codeLines.length === 0) {
-          const key = metaMatch[1].toLowerCase();
-          const val = metaMatch[2].trim();
-          this.metadata[key] = val;
-        } else {
-          codeLines.push(line);
-        }
+        codeLines.push(line);
       } else if (currentTag) {
         // Parse asset tags
         switch (currentTag) {
@@ -119,11 +169,17 @@ end
           case 'SFX':
             this.audio.loadFromSFXLine(line);
             break;
+          case 'PATTERNS':
+            this.audio.loadFromPatternsLine(line);
+            break;
+          case 'TRACKS':
+            this.audio.loadFromTracksLine(line);
+            break;
         }
       }
     }
 
-    this.code = codeLines.join('\n').trimStart();
+    this.setCode(codeLines.join('\n'));
   }
 
   /**

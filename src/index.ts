@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { Context } from '@deepseek-ai/cordis';
 import { Cartridge } from './core/cartridge.js';
@@ -42,16 +43,94 @@ export interface Tic80PluginConfig {
   cartFilePath?: string;
 }
 
-export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
-  // 1. Resolve default blank cartridge file portably
-  const candidateCartPaths = [
-    config.cartFilePath ? path.resolve(config.cartFilePath) : null,
-    path.resolve(process.cwd(), 'cartridge/game.lua'),
-    path.resolve(__dirname, '../cartridge/game.lua'),
-    path.resolve(__dirname, '../../cartridge/game.lua'),
-  ].filter(Boolean) as string[];
+/**
+ * Determine the active DSH workspace directory.
+ * Priority:
+ * 1. ctx.workspaceRegistry.list() -> active workspace entity path
+ * 2. Environment variable DSH_WORKSPACE or WORKSPACE_DIR
+ * 3. ~/.dsh/storages/workspace.json -> active workspace entry
+ * 4. process.cwd()
+ * 
+ * Safety constraint: NEVER return the plugin package's own root (__dirname)
+ * as the user's workspace directory!
+ */
+export function resolveWorkspaceDir(ctx?: any): string {
+  const pluginRoot = path.resolve(__dirname, '..');
 
-  const defaultCartPath = candidateCartPaths.find(p => fs.existsSync(p)) || candidateCartPaths[0];
+  // 1. Check Cordis WorkspaceRegistry service
+  try {
+    if (ctx?.workspaceRegistry?.list) {
+      const list = ctx.workspaceRegistry.list();
+      if (Array.isArray(list) && list.length > 0 && list[0]?.path) {
+        const candidate = path.resolve(list[0].path);
+        if (candidate !== pluginRoot) {
+          return candidate;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. Check environment variables
+  const envWs = process.env.DSH_WORKSPACE || process.env.WORKSPACE_DIR;
+  if (envWs && fs.existsSync(envWs)) {
+    const candidate = path.resolve(envWs);
+    if (candidate !== pluginRoot) {
+      return candidate;
+    }
+  }
+
+  // 3. Inspect DSH global storage: ~/.dsh/storages/workspace.json
+  try {
+    const homedir = os.homedir();
+    const wsJsonPath = path.join(homedir, '.dsh', 'storages', 'workspace.json');
+    if (fs.existsSync(wsJsonPath)) {
+      const data = JSON.parse(fs.readFileSync(wsJsonPath, 'utf8'));
+      const activeId = data?.global?.workspaceIds?.[0];
+      if (activeId && data?.tables?.workspaces?.[activeId]?.path) {
+        const candidate = path.resolve(data.tables.workspaces[activeId].path);
+        if (fs.existsSync(candidate) && candidate !== pluginRoot) {
+          return candidate;
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // 4. Fallback to process.cwd()
+  return path.resolve(process.cwd());
+}
+
+/**
+ * Resolve the target cartridge file path within the active workspace.
+ */
+export function resolveCartridgePath(workspaceDir: string, configPath?: string): string {
+  if (configPath) {
+    return path.isAbsolute(configPath) ? configPath : path.resolve(workspaceDir, configPath);
+  }
+
+  // In workspaceDir, look for existing game cartridges
+  const candidates = [
+    path.resolve(workspaceDir, 'cartridge/game.lua'),
+    path.resolve(workspaceDir, 'game.lua'),
+  ];
+
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      return c;
+    }
+  }
+
+  // Default target path in workspace if none exist yet
+  return path.resolve(workspaceDir, 'cartridge/game.lua');
+}
+
+export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
+  // 1. Resolve workspace and bound cartridge file path
+  const workspaceDir = resolveWorkspaceDir(ctx);
+  const defaultCartPath = resolveCartridgePath(workspaceDir, config.cartFilePath);
 
   let initialCart: Cartridge;
   if (fs.existsSync(defaultCartPath)) {
@@ -60,10 +139,28 @@ export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
       initialCart = new Cartridge();
       initialCart.loadFromText(fileContent);
     } catch {
-      initialCart = createTemplate(config.defaultTemplate || 'minimal');
+      initialCart = createTemplate(config.defaultTemplate || 'sokoban');
     }
   } else {
-    initialCart = createTemplate(config.defaultTemplate || 'minimal');
+    // If not existing in workspace, seed from plugin's template/seed file (as read-only source)
+    const seedCandidates = [
+      path.resolve(__dirname, '../cartridge/game.lua'),
+      path.resolve(__dirname, '../../cartridge/game.lua'),
+    ];
+    const seedFile = seedCandidates.find(p => fs.existsSync(p));
+    if (seedFile) {
+      try {
+        const seedContent = fs.readFileSync(seedFile, 'utf8');
+        initialCart = new Cartridge();
+        initialCart.loadFromText(seedContent);
+      } catch {
+        initialCart = createTemplate(config.defaultTemplate || 'sokoban');
+      }
+    } else {
+      initialCart = createTemplate(config.defaultTemplate || 'sokoban');
+    }
+
+    // Write initial cartridge to the user's workspace target
     try {
       fs.mkdirSync(path.dirname(defaultCartPath), { recursive: true });
       fs.writeFileSync(defaultCartPath, initialCart.toText(), 'utf8');
@@ -78,6 +175,7 @@ export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
     cartridge: initialCart,
     studio,
     boundFilePath: defaultCartPath,
+    getWorkspaceDir: () => resolveWorkspaceDir(ctx),
   };
 
   // 2. Register all 13 TIC-80 model tools
@@ -107,7 +205,7 @@ export function apply(ctx: Context, config: Tic80PluginConfig = {}) {
         text: () => {
           const cartCode = toolCtx.cartridge.toText();
           return buildStudioSystemPrompt({
-            cartPath: defaultCartPath,
+            cartPath: toolCtx.boundFilePath || defaultCartPath,
             cartCode,
           });
         }

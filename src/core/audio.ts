@@ -456,6 +456,50 @@ export class AudioManager {
     }
   }
 
+  loadFromPatternsLine(line: string) {
+    const match = line.match(/--\s*(\d+):([0-9a-fA-F]+)/);
+    if (!match) return;
+    const pid = parseInt(match[1], 10);
+    const hex = match[2];
+    if (pid < 0 || pid >= MAX_PATTERNS) return;
+
+    const pat = this.patterns[pid];
+    let offset = 0;
+    for (let r = 0; r < PATTERN_ROWS && offset + 5 <= hex.length; r++) {
+      for (let ch = 0; ch < MUSIC_CHANNELS && offset + 5 <= hex.length; ch++) {
+        const noteVal = parseInt(hex.substring(offset, offset + 2), 16);
+        const sfx = parseInt(hex.substring(offset + 2, offset + 4), 16);
+        const volume = parseInt(hex.substring(offset + 4, offset + 5), 16);
+        offset += 5;
+
+        pat.rows[r][ch] = {
+          note: noteVal === 0 ? -1 : noteVal % 12,
+          octave: Math.floor(noteVal / 12),
+          sfx: sfx === 0 ? -1 : sfx,
+          volume,
+        };
+      }
+    }
+  }
+
+  loadFromTracksLine(line: string) {
+    const match = line.match(/--\s*(\d+):([0-9a-fA-F]+)/);
+    if (!match) return;
+    const tid = parseInt(match[1], 10);
+    const hex = match[2];
+    if (tid < 0 || tid >= MAX_TRACKS) return;
+
+    const t = this.tracks[tid];
+    t.tempo = parseInt(hex.substring(0, 2), 16) || 120;
+    t.speed = parseInt(hex.substring(2, 4), 16) || 6;
+    let offset = 4;
+    for (let i = 0; i < TRACK_FRAMES && offset + 2 <= hex.length; i++) {
+      const p = parseInt(hex.substring(offset, offset + 2), 16);
+      t.patterns[i] = p === 255 ? -1 : p;
+      offset += 2;
+    }
+  }
+
   getRawWaveforms(): Uint8Array {
     return this.waveforms;
   }

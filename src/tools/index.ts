@@ -17,10 +17,15 @@ export interface ToolContext {
   cartridge: Cartridge;
   studio: WebStudioServer;
   boundFilePath?: string;
+  getWorkspaceDir?: () => string;
 }
 
 export function createTic80Tools(toolCtx: ToolContext) {
   const tools = [];
+
+  const getWorkspaceDir = () => {
+    return toolCtx.getWorkspaceDir ? toolCtx.getWorkspaceDir() : process.cwd();
+  };
 
   // Helper to sync changes to studio and disk
   const syncChanges = async (updateType: 'CODE' | 'SPRITES' | 'MAP' | 'AUDIO' | 'PALETTE' | 'ALL') => {
@@ -73,7 +78,9 @@ export function createTic80Tools(toolCtx: ToolContext) {
       if (args.author) toolCtx.cartridge.metadata.author = args.author;
       if (args.script) toolCtx.cartridge.metadata.script = args.script;
       if (args.filePath) {
-        toolCtx.boundFilePath = path.resolve(args.filePath);
+        toolCtx.boundFilePath = path.isAbsolute(args.filePath)
+          ? args.filePath
+          : path.resolve(getWorkspaceDir(), args.filePath);
         await fs.mkdir(path.dirname(toolCtx.boundFilePath), { recursive: true });
         await fs.writeFile(toolCtx.boundFilePath, toolCtx.cartridge.toText(), 'utf8');
       }
@@ -185,7 +192,7 @@ export function createTic80Tools(toolCtx: ToolContext) {
       render: (_args, val) => [{ type: 'text', text: JSON.stringify(val, null, 2) }],
     },
     async execute(args): Promise<any> {
-      toolCtx.cartridge.code = args.code;
+      toolCtx.cartridge.setCode(args.code);
       const validation = args.validate !== false ? toolCtx.cartridge.validate() : null;
 
       await syncChanges('CODE');
@@ -193,7 +200,9 @@ export function createTic80Tools(toolCtx: ToolContext) {
       return JSON.parse(JSON.stringify({
         success: true,
         message: 'Game code updated and synced.',
-        codeBytes: Buffer.byteLength(args.code, 'utf8'),
+        codeBytes: Buffer.byteLength(toolCtx.cartridge.code, 'utf8'),
+        metadata: toolCtx.cartridge.metadata,
+        boundFilePath: toolCtx.boundFilePath || null,
         validation,
       }));
     },
@@ -666,7 +675,7 @@ export function createTic80Tools(toolCtx: ToolContext) {
         }));
       } else {
         // Native runner
-        const tempCartPath = path.resolve(process.cwd(), 'temp_run.lua');
+        const tempCartPath = path.resolve(getWorkspaceDir(), 'temp_run.lua');
         await fs.writeFile(tempCartPath, toolCtx.cartridge.toText(), 'utf8');
 
         const res = await NativeRunner.run({
@@ -710,7 +719,9 @@ export function createTic80Tools(toolCtx: ToolContext) {
       render: (_args, val) => [{ type: 'text', text: JSON.stringify(val, null, 2) }],
     },
     async execute(args): Promise<any> {
-      const outputDir = path.resolve(args.outputDir || path.resolve(process.cwd(), 'export'));
+      const outputDir = args.outputDir
+        ? (path.isAbsolute(args.outputDir) ? args.outputDir : path.resolve(getWorkspaceDir(), args.outputDir))
+        : path.resolve(getWorkspaceDir(), 'export');
       const format = (args.format as any) || 'all';
       const result = await CartridgeExporter.export(toolCtx.cartridge, {
         format,

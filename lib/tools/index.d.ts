@@ -9,6 +9,7 @@ export interface ToolContext {
     cartridge: Cartridge;
     studio: WebStudioServer;
     boundFilePath?: string;
+    getWorkspaceDir?: () => string;
 }
 export declare function createTic80Tools(toolCtx: ToolContext): import("@deepseek-ai/dsh-tools").ToolDefinition[];
 //# sourceMappingURL=index.d.ts.map

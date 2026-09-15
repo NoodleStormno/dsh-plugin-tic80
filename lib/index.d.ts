@@ -26,6 +26,22 @@ export interface Tic80PluginConfig {
     /** Optional file path to automatically sync/bind cartridge to */
     cartFilePath?: string;
 }
+/**
+ * Determine the active DSH workspace directory.
+ * Priority:
+ * 1. ctx.workspaceRegistry.list() -> active workspace entity path
+ * 2. Environment variable DSH_WORKSPACE or WORKSPACE_DIR
+ * 3. ~/.dsh/storages/workspace.json -> active workspace entry
+ * 4. process.cwd()
+ *
+ * Safety constraint: NEVER return the plugin package's own root (__dirname)
+ * as the user's workspace directory!
+ */
+export declare function resolveWorkspaceDir(ctx?: any): string;
+/**
+ * Resolve the target cartridge file path within the active workspace.
+ */
+export declare function resolveCartridgePath(workspaceDir: string, configPath?: string): string;
 export declare function apply(ctx: Context, config?: Tic80PluginConfig): void;
 export * from './core/index.js';
 export * from './runner/index.js';

@@ -53,6 +53,8 @@ export declare class AudioManager {
     toTracksChunkLines(): string[];
     loadFromSFXLine(line: string): void;
     loadFromWavesLine(line: string): void;
+    loadFromPatternsLine(line: string): void;
+    loadFromTracksLine(line: string): void;
     getRawWaveforms(): Uint8Array;
     loadRawWaveforms(buffer: Uint8Array): void;
 }
